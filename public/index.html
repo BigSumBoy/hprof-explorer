@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HPROF Explorer</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="hero">
+  <div class="hero-inner">
+    <div class="brand">
+      <div class="logo">H</div>
+      <div>
+        <h1>HPROF Explorer</h1>
+        <p id="fileLine">加载中…</p>
+      </div>
+    </div>
+    <div class="pills" id="pills"></div>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab active" data-tab="overview" role="tab">概览</button>
+  <button class="tab" data-tab="classes" role="tab">类直方图</button>
+  <button class="tab" data-tab="objects" role="tab">对象浏览</button>
+  <button class="tab" data-tab="retained" role="tab">Retained</button>
+  <button class="tab" data-tab="domtree" role="tab">支配树</button>
+  <button class="tab" data-tab="strings" role="tab">字符串</button>
+  <button class="tab" data-tab="roots" role="tab">GC Roots</button>
+  <div class="tabs-spacer"></div>
+  <span class="hint">ART hprof · 蓝色胶囊可跳转 · 行尾 › 查看详情</span>
+</nav>
+
+<main>
+  <section id="panel-overview" class="panel active">
+    <div class="cards" id="statCards"></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><h2>最大的类</h2><a href="#" id="allClasses">查看全部 →</a></div>
+        <table class="table">
+          <thead><tr><th>类</th><th class="num">实例数</th><th class="num">字节</th><th class="barcell"></th><th class="go"></th></tr></thead>
+          <tbody id="topClassRows"></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>根类型</h2></div>
+        <table class="table compact">
+          <thead><tr><th>类型</th><th class="num">数量</th></tr></thead>
+          <tbody id="rootSummaryRows"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-head"><h2>最长的字符串</h2><a href="#" id="allStrings">查看全部 →</a></div>
+        <div id="topStringList" class="string-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>文件信息</h2></div>
+        <dl class="meta" id="fileMeta"></dl>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-classes" class="panel">
+    <div class="toolbar">
+      <select id="classSort">
+        <option value="bytes">按字节排序</option>
+        <option value="count">按实例数排序</option>
+        <option value="name">按名称排序</option>
+      </select>
+      <span class="muted" id="classCount"></span>
+    </div>
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr><th>类</th><th class="num">实例 / 数组</th><th class="num">字节</th><th class="barcell"></th><th class="go"></th></tr>
+          <tr class="filters">
+            <th><input data-filter="classes.q" placeholder="类名"></th>
+            <th><input data-filter="classes.minCount" type="number" placeholder="≥"></th>
+            <th><input data-filter="classes.minBytes" type="number" placeholder="≥ 字节"></th>
+            <th></th><th></th>
+          </tr>
+        </thead>
+        <tbody id="classRows"></tbody>
+      </table>
+      <div class="note" id="classNote"></div>
+    </div>
+  </section>
+
+  <section id="panel-objects" class="panel">
+    <div class="toolbar">
+      <div id="objectCrumb" class="crumb"></div>
+      <div class="tabs-spacer"></div>
+      <button id="objectClassPaths" class="button ghost" type="button" hidden>GC Root 路径</button>
+      <a href="#" id="backToClasses" class="button ghost">← 返回类列表</a>
+    </div>
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr><th>对象 ID</th><th>类</th><th>堆</th><th class="num">字节</th><th class="go"></th></tr>
+          <tr class="filters">
+            <th><input data-filter="objects.id" placeholder="ID / 前缀"></th>
+            <th><input data-filter="objects.className" placeholder="类名"></th>
+            <th><input data-filter="objects.heap" placeholder="app / zygote / image"></th>
+            <th><input data-filter="objects.minSize" type="number" placeholder="≥ 字节"></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="objectRows"></tbody>
+      </table>
+      <div class="pager" id="objectPager"></div>
+    </div>
+  </section>
+
+  <section id="panel-retained" class="panel">
+    <div class="toolbar">
+      <span class="muted">按 Retained Size 降序（可达对象前 500 名），点击查看对象详情与引用链</span>
+      <div class="tabs-spacer"></div>
+      <span class="muted" id="retainedCount"></span>
+    </div>
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr><th class="num">#</th><th>对象</th><th>类</th><th class="num">Shallow</th><th class="num">Retained</th><th class="barcell"></th><th class="go"></th></tr>
+          <tr class="filters">
+            <th></th>
+            <th><input data-filter="retained.id" placeholder="ID"></th>
+            <th><input data-filter="retained.className" placeholder="类名"></th>
+            <th></th>
+            <th><input data-filter="retained.minRetained" type="number" placeholder="≥ 字节"></th>
+            <th></th><th></th>
+          </tr>
+        </thead>
+        <tbody id="retainedRows"></tbody>
+      </table>
+      <div class="pager" id="retainedPager"></div>
+    </div>
+  </section>
+
+  <section id="panel-domtree" class="panel">
+    <div class="toolbar">
+      <div id="treeCrumb" class="crumb">支配树 <span class="sub">从 GC Roots / Classes 开始</span></div>
+      <input id="treeFilter" type="search" placeholder="过滤当前层：类名 / ID">
+      <div class="tabs-spacer"></div>
+      <button id="treeReturnDetail" class="button ghost" type="button" hidden>← 返回对象详情</button>
+      <button id="treeBack" class="button ghost" type="button" hidden>← 回到支配树根</button>
+      <button id="treeCollapse" class="button ghost" type="button">全部收起</button>
+    </div>
+    <div class="card">
+      <table class="table tree-table">
+        <thead><tr><th>对象 / 类</th><th class="num">Shallow</th><th class="num">Retained</th><th class="num">子节点</th><th class="go"></th></tr></thead>
+        <tbody id="treeRows"></tbody>
+      </table>
+      <div class="note">点击 ▸ 展开/收起子树；点击行尾 › 或对象名查看详情。每一层默认按 Retained Size 显示前 100 个节点。</div>
+    </div>
+  </section>
+
+  <section id="panel-strings" class="panel">
+    <div class="toolbar">
+      <label class="check"><input id="stringReadable" type="checkbox" checked> 只看可读文本</label>
+      <div class="tabs-spacer"></div>
+      <span class="muted" id="stringCount"></span>
+    </div>
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr><th>对象 ID</th><th class="num">长度</th><th>内容预览</th><th class="go"></th></tr>
+          <tr class="filters">
+            <th><input data-filter="strings.id" placeholder="ID / 前缀"></th>
+            <th><input data-filter="strings.minLength" type="number" placeholder="≥"></th>
+            <th><input data-filter="strings.q" placeholder="内容包含…"></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="stringRows"></tbody>
+      </table>
+      <div class="pager" id="stringPager"></div>
+    </div>
+  </section>
+
+  <section id="panel-roots" class="panel">
+    <div class="card">
+      <div class="card-head"><h2>根对象</h2></div>
+      <table class="table">
+        <thead>
+          <tr><th>对象 ID</th><th>类</th><th>根类型</th><th>堆</th><th class="go"></th></tr>
+          <tr class="filters">
+            <th><input data-filter="roots.id" placeholder="ID / 前缀"></th>
+            <th><input data-filter="roots.className" placeholder="类名"></th>
+            <th><input data-filter="roots.type" placeholder="JNI_GLOBAL…"></th>
+            <th><input data-filter="roots.heap" placeholder="app / zygote / image"></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rootRows"></tbody>
+      </table>
+      <div class="pager" id="rootPager"></div>
+    </div>
+  </section>
+</main>
+
+<aside id="drawer" class="drawer" hidden>
+  <div id="drawerResizer" class="drawer-resizer" title="拖动调整宽度，双击复位"></div>
+  <div class="drawer-head">
+    <button id="drawerBack" class="drawer-back" type="button" title="返回上一级（Alt+←，Esc 关闭）">← 返回</button>
+    <div>
+      <div class="drawer-kicker" id="drawerKind">对象</div>
+      <h2 id="drawerTitle">—</h2>
+      <div class="drawer-sub" id="drawerSub"></div>
+    </div>
+    <button class="close" id="closeDrawer" aria-label="关闭">×</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+<div id="overlay" class="overlay" hidden></div>
+
+<div id="classPathModal" class="modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="drawer-kicker">All GC Roots</div>
+        <h2 id="classPathTitle">—</h2>
+        <div class="drawer-sub" id="classPathSub"></div>
+      </div>
+      <div class="modal-tools">
+        <label class="check"><input id="classPathsWeak" type="checkbox"> 包含弱引用</label>
+        <button id="classPathModeTree" class="button ghost" type="button">树形</button>
+        <button id="classPathModeText" class="button ghost" type="button">文本</button>
+      </div>
+      <button class="close" id="closeClassPath" aria-label="关闭">×</button>
+    </div>
+    <div class="modal-body" id="classPathBody"></div>
+  </div>
+</div>
+<div id="modalOverlay" class="overlay modal-overlay" hidden></div>
+
+<footer class="foot">HPROF Explorer · 纯 Node.js 解析，无第三方依赖</footer>
+<script src="app.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,8 @@
+data/
+node_modules/
+*.png
+!screenshot.png
+!screenshot-retained.png
+!screenshot-tree.png
+!screenshot-classpaths.png
+!screenshot-path.png

@@ -1,0 +1,14 @@
+{
+  "name": "hprof-explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dependency-free Android hprof parser with a web UI",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "stats": "node src/stats.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
