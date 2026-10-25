@@ -18,16 +18,65 @@ Harness Host
 
 ## 安装与生效
 
+本机通过 DSH 的 `plugin_manager` 安装时：
+
 ```json
 { "action": "install_bundle", "target": "D:/Code/aosp/tools/hprof-explorer/dsh-plugin" }
 ```
+
+### 另一台机器
+
+插件不在 npm 上，必须连同 HPROF Explorer 仓库一起 clone；`src/hprof.mjs` 是解析器，不能只复制 `dsh-plugin/`。
+
+```powershell
+git clone https://github.com/BigSumBoy/hprof-explorer.git
+cd hprof-explorer
+dsh plugin --profile web add link:<clone-path>/dsh-plugin
+```
+
+例如 Windows：
+
+```powershell
+dsh plugin --profile web add link:D:/src/hprof-explorer/dsh-plugin
+```
+
+macOS / Linux：
+
+```bash
+dsh plugin --profile web add link:/Users/me/src/hprof-explorer/dsh-plugin
+```
+
+从 DSH 源码 checkout 运行时，把 `dsh` 换成 `pnpm dsh`：
+
+```powershell
+pnpm dsh plugin --profile web add link:D:/src/hprof-explorer/dsh-plugin
+```
+
+`link:` 很重要：插件默认把 `appDir` 设为自身包目录的上一级，也就是完整的 HPROF checkout。如果用了复制安装而不是 link，需要在 profile 的 `cordis.patch.yml` 里显式配置：
+
+```yaml
+- insert:
+    - id: hprof-explorer
+      name: '@local/dsh-hprof-explorer'
+      config:
+        appDir: 'D:/src/hprof-explorer'
+```
+
+安装后：
+
+1. 重启 DSH Host；
+2. 刷新 Web 页面；
+3. 左侧边栏点 HPROF 图标打开主面板；
+4. 选择或打开 hprof 文件。
+
+插件依赖一个较新的 DSH；如果启动时报 `tools` / `webServer` / `conversation` 相关服务缺失，说明 DSH 版本太旧，需要升级到包含这些 slot 和服务接口的版本。HPROF 解析器本身没有 npm 依赖，不需要在仓库里 `npm install`。
 
 已安装过的 `link:` 包更新代码后，需要：
 
 1. **重启 DSH Host**（Node 模块已加载，配置热重载不会重新执行插件代码）；
 2. **刷新 Web 页面**（Client 半需要重新拉取模块表）。
 
-卸载：`plugin_manager` 的 `remove_bundle`，target `@local/dsh-hprof-explorer`。
+卸载：`plugin_manager` 的 `remove_bundle`，target `@local/dsh-hprof-explorer`；或 `dsh plugin --profile web remove @local/dsh-hprof-explorer`。
 
 ## 工具
 

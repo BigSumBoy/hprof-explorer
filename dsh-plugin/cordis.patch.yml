@@ -1,8 +1,10 @@
-# Installed into a DSH profile by `plugin_manager install_bundle`.
-# `appDir` must point at the HPROF Explorer checkout (the directory holding
-# src/hprof.mjs). Use forward slashes; Windows accepts them too.
+# Installed into a DSH profile by `plugin_manager install_bundle`, or by
+# `dsh plugin --profile web add link:<checkout>/dsh-plugin`.
+#
+# `appDir` defaults to the parent of this plugin package, so install with a
+# `link:` spec: the link resolves to the full HPROF Explorer checkout, which
+# holds src/hprof.mjs. For a copied install, add an explicit appDir config
+# pointing at that checkout.
 - insert:
     - id: hprof-explorer
       name: '@local/dsh-hprof-explorer'
-      config:
-        appDir: 'D:/Code/aosp/tools/hprof-explorer'
