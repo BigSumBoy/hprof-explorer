@@ -253,6 +253,8 @@ server.on('error', (error) => {
 });
 
 server.listen(args.port, args.host, () => {
-  console.log(`HPROF Explorer: http://${args.host}:${args.port}`);
+  const address = server.address();
+  const port = typeof address === 'object' && address !== null ? address.port : args.port;
+  console.log(`HPROF Explorer: http://${args.host}:${port}`);
   console.log(`file: ${args.hprof}`);
 });

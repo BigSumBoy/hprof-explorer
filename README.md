@@ -36,6 +36,10 @@ node src/server.mjs --hprof data/com.android.systemui_....hprof
 node src/stats.mjs data/dump.hprof
 ```
 
+### 接入 DeepSeek Harness
+
+`dsh-plugin/` 是把本工具做成 Harness 原生能力的插件：通用 `hprof_api` 服务入口、`hprof_*` 工具、独立引擎进程、同源 `/hprof-api` 路由，以及 Harness 主面板里的分析工作区 + 完整对话（不是 iframe）。安装与配置见 [dsh-plugin/README.md](dsh-plugin/README.md)。
+
 ## 功能
 
 - **概览**：类/实例/数组/字符串/Root 数量，实例字段与数组字节数，逻辑堆（app/zygote/image），最大的类、最长可读字符串、根类型分布。
@@ -133,6 +137,7 @@ src/hprof.mjs   解析、索引、支配树、引用链
 src/server.mjs  HTTP 服务 + JSON API
 src/stats.mjs   命令行统计
 public/         前端（原生 HTML/CSS/JS，无构建步骤）
+dsh-plugin/     DeepSeek Harness 插件（hprof_api 服务 + 工具 + 引擎进程 + 工作区）
 data/           本地 hprof（已加入 .gitignore）
 docs/DESIGN.md  设计、实现原理、进度与维护指南
 ```

@@ -1,0 +1,33 @@
+{
+  "name": "@local/dsh-hprof-explorer",
+  "version": "0.10.0",
+  "private": true,
+  "type": "module",
+  "description": "DeepSeek Harness plugin: a generic HPROF service, findings, UI-state bridge, a typed hprof_ptc runner, hprof_* tools, an engine process, and an HPROF workspace panel.",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "engine.mjs",
+    "service.mjs",
+    "findings.mjs",
+    "ui-state.mjs",
+    "ptc.mjs",
+    "ptc-runner.mjs",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "PTC_SEAM_PLAN.md"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# Installed into a DSH profile by `plugin_manager install_bundle`.
+# `appDir` must point at the HPROF Explorer checkout (the directory holding
+# src/hprof.mjs). Use forward slashes; Windows accepts them too.
+- insert:
+    - id: hprof-explorer
+      name: '@local/dsh-hprof-explorer'
+      config:
+        appDir: 'D:/Code/aosp/tools/hprof-explorer'
