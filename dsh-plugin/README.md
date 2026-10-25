@@ -2,6 +2,8 @@
 
 把 HPROF Explorer 做成 DeepSeek Harness 的原生能力：**引擎子进程 + `hprof_*` 工具 + 同源 HTTP 路由 + 原生 Web 面板**。解析器仍是 `src/hprof.mjs`，但不再需要启动 `server.mjs`。
 
+设计与取舍见 [DESIGN.md](DESIGN.md)；通用 PTC seam 的延后方案见 [PTC_SEAM_PLAN.md](PTC_SEAM_PLAN.md)。
+
 ```
 Harness Host
   └─ @local/dsh-hprof-explorer

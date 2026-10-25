@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-hprof-explorer",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "private": true,
   "type": "module",
   "description": "DeepSeek Harness plugin: a generic HPROF service, findings, UI-state bridge, a typed hprof_ptc runner, hprof_* tools, an engine process, and an HPROF workspace panel.",
@@ -20,6 +20,7 @@
     "client.js",
     "cordis.patch.yml",
     "README.md",
+    "DESIGN.md",
     "PTC_SEAM_PLAN.md"
   ],
   "dsh": {
