@@ -78,6 +78,8 @@ window.__ModuleLoader__.load({
 .hp-table tbody tr.hp-row-selected td { color: var(--dsw-alias-label-primary); }
 .hp-table tbody tr.hp-row-selected td:first-child { box-shadow: inset 3px 0 0 var(--dsw-alias-brand-primary); }
 .hp-table tbody tr.hp-row-selected:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 15%, transparent); }
+.hp-table tbody td:first-child { font-weight: 500; color: var(--dsw-alias-label-primary); }
+.hp-table tbody td.hp-cell-strong { font-weight: 500; color: var(--dsw-alias-label-primary); }
 .hp-row-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; white-space: nowrap; }
 .hp-action { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 22px; padding: 2px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 32%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 6%, var(--dsw-alias-bg-layer-1)); color: var(--dsw-alias-brand-primary); font-family: inherit; font-size: 11px; font-weight: 500; line-height: 1.3; white-space: nowrap; cursor: pointer; transition: background .12s ease, border-color .12s ease, color .12s ease; }
 .hp-action:hover { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); }
@@ -101,6 +103,10 @@ window.__ModuleLoader__.load({
 .hp-tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .hp-tree-via { flex: 0 0 auto; color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 400; }
 .hp-tree-count { flex: 0 0 auto; margin-left: auto; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-2)); color: var(--dsw-alias-label-secondary); font-size: 10px; font-weight: 500; white-space: nowrap; }
+.hp-tree-name-button { min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 500; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.hp-tree-name-button:hover { color: var(--dsw-alias-brand-primary); text-decoration: underline; text-underline-offset: 2px; }
+.hp-tree-id { flex: 0 0 auto; color: var(--dsw-alias-label-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 500; }
+.hp-tree-metric { flex: 0 0 auto; padding: 1px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: 10px; font-weight: 500; white-space: nowrap; }
 .hp-filter { position: relative; display: flex; align-items: center; }
 .hp-filter-icon { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 11px; height: 11px; color: var(--dsw-alias-label-secondary); pointer-events: none; }
 .hp-filter-prefix { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); font-size: 10px; line-height: 1; color: var(--dsw-alias-label-secondary); pointer-events: none; }
@@ -371,7 +377,7 @@ window.__ModuleLoader__.load({
         background: 'var(--dsw-alias-bg-base)', color: 'var(--dsw-alias-label-primary)',
       },
       td: { padding: '4px 8px', borderBottom: '1px solid var(--dsw-alias-border-l2)', verticalAlign: 'top' },
-      mono: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11 },
+      mono: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12, fontWeight: 500 },
       muted: { color: 'var(--dsw-alias-label-secondary)', fontSize: 12 },
       error: { color: 'var(--dsw-alias-state-error-primary)', fontSize: 12, marginBottom: 8 },
       notice: { color: 'var(--dsw-alias-state-success-primary)', fontSize: 12, marginBottom: 8, wordBreak: 'break-all' },
@@ -524,6 +530,7 @@ window.__ModuleLoader__.load({
                   : undefined,
               }, effectiveColumns.map((column) => h('td', {
                 key: column.key,
+                className: column.strong ? 'hp-cell-strong' : undefined,
                 style: { ...S.td, textAlign: column.align ?? 'left', ...(virtual ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : {}) },
               }, column.render === undefined ? row[column.key] : column.render(row))))
             }),
@@ -615,7 +622,7 @@ window.__ModuleLoader__.load({
           columns: [
             { key: 'id', title: '对象', render: (row) => h('span', { style: S.mono }, hexId(row.id)) },
             { key: 'length', title: '长度', align: 'right' },
-            { key: 'text', title: '内容', render: (row) => h('span', { style: { ...S.mono, whiteSpace: 'pre-wrap' } }, row.text) },
+            { key: 'text', title: '内容', strong: true, render: (row) => h('span', { style: { ...S.mono, whiteSpace: 'pre-wrap' } }, row.text) },
           ],
           rows: data.topStrings ?? [],
           onRowClick: (row) => onObject(row.id),
@@ -1167,7 +1174,7 @@ window.__ModuleLoader__.load({
             { key: 'id', title: '对象', render: (row) => h('span', { style: S.mono }, hexId(row.id)) },
             { key: 'length', title: '长度', align: 'right' },
             {
-              key: 'text', title: '内容',
+              key: 'text', title: '内容', strong: true,
               render: (row) => h('span', { style: { ...S.mono, whiteSpace: 'pre-wrap' } }, row.binary ? `${row.text} [binary]` : row.text),
             },
           ],
@@ -1336,34 +1343,49 @@ window.__ModuleLoader__.load({
       const children = useFetch(open && dumpId
         ? `${API}/domtree?dump_id=${encodeURIComponent(dumpId)}&parent=${node.id}&offset=${offset}&limit=100`
         : null, { cache: true })
-      return h('div', null,
+      const tone = depth === 0
+        ? 'var(--dsw-alias-brand-primary)'
+        : depth === 1
+          ? 'var(--dsw-alias-state-success-primary)'
+          : depth === 2
+            ? 'var(--dsw-alias-state-warn-primary)'
+            : 'var(--dsw-alias-label-secondary)'
+      return h('div', { className: 'hp-tree' },
         h('div', {
-          style: {
-            display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0 3px ' + (depth * 14),
-            borderBottom: '1px solid var(--dsw-alias-border-l1)',
-          },
+          className: `hp-tree-row hp-tree-row-depth-${Math.min(depth, 3)}`,
+          role: 'treeitem',
+          'aria-expanded': node.children === 0 ? undefined : open,
         },
+          depth > 0
+            ? h('span', { className: 'hp-tree-indents', 'aria-hidden': true },
+              Array.from({ length: depth }, (_, index) => h('span', { key: index, className: 'hp-tree-indent' })))
+            : null,
           h('button', {
-            type: 'button', className: 'hp-link', disabled: node.children === 0,
+            type: 'button', className: 'hp-tree-caret', disabled: node.children === 0,
+            'aria-label': node.children === 0 ? undefined : open ? '折叠节点' : '展开节点',
             onClick: () => onToggle(node.id),
           }, node.children === 0 ? '·' : open ? '▾' : '▸'),
-          h('button', { type: 'button', className: 'hp-link', onClick: () => onObject(node.id) },
-            h('span', { style: S.mono }, node.className)),
-          h('span', { style: S.muted }, hexId(node.id)),
+          h('span', { className: 'hp-tree-dot', style: { background: tone }, 'aria-hidden': true }),
+          h('button', {
+            type: 'button', className: 'hp-tree-name hp-tree-name-button',
+            title: '查看对象详情',
+            onClick: () => onObject(node.id),
+          }, node.className),
+          h('span', { className: 'hp-tree-id' }, hexId(node.id)),
           h('span', { style: { flex: 1 } }),
-          h('span', { style: S.muted }, `retained ${formatBytes(node.retained)}`),
-          h('span', { style: S.muted }, `shallow ${formatBytes(node.shallow)}`)),
+          h('span', { className: 'hp-tree-metric' }, `retained ${formatBytes(node.retained)}`),
+          h('span', { className: 'hp-tree-metric' }, `shallow ${formatBytes(node.shallow)}`)),
         open ? h('div', null,
           children.error !== null ? h('div', { style: S.error }, children.error) : null,
-          children.data === null ? h('div', { style: { ...S.muted, paddingLeft: (depth + 1) * 14 } }, '加载中…') : null,
+          children.data === null ? h('div', { style: { ...S.muted, paddingLeft: (depth + 1) * 14 + 22 } }, '加载中…') : null,
           (children.data?.items ?? []).filter((child) => nodeMatches(child, filter)).map((child) => h(DomNode, {
             key: child.id, dumpId, node: child, depth: depth + 1, onObject, filter, expanded, onToggle,
           })),
           children.data !== null && children.data.total > offset + 100
             ? h('button', {
               type: 'button',
-              className: 'hp-link',
-              style: { paddingLeft: (depth + 1) * 14 },
+              className: 'hp-action hp-action-quiet',
+              style: { marginLeft: (depth + 1) * 14 + 22, marginTop: 4 },
               onClick: () => setOffset((value) => value + 100),
             }, `显示更多（共 ${children.data.total}）`)
             : null)
