@@ -11,6 +11,7 @@
 import fs from 'node:fs/promises'
 import { createFindingsStore } from './findings.mjs'
 import { createUiState } from './ui-state.mjs'
+import { UI_MANIFEST } from './ui-manifest.mjs'
 
 const CAPABILITIES = {
   name: 'hprof',
@@ -53,7 +54,8 @@ const CAPABILITIES = {
     'findings.update': 'Update one finding. params: { dump_id?, id, title?, note?, severity?, tags? }',
     'findings.delete': 'Delete one finding. params: { dump_id?, id }',
     'ui.state': 'Read live panel state. params: { dump_id?, client_id? }',
-    'ui.command': 'Send one UI action: selectTab, selectRow, setFilters, setPage, setSort, toggleNode, selectObject, selectClass, openDump, closeDump, closeDrawer, refresh, runReport, draftMessage, notice. params: { dump_id?, client_id?, action, params? }',
+    'ui.manifest': 'Return the model-facing UI action catalog.',
+    'ui.command': 'Send one UI action: selectTab, selectRow, setFilters, setPage, setSort, setWeak, toggleNode, selectObject, selectClass, openDump, closeDump, closeDrawer, refresh, runReport, draftMessage, notice. params: { dump_id?, client_id?, action, params? }',
     'ui.events': 'Read the bounded UI event ledger. params: { dump_id?, limit? }',
   },
   examples: [
@@ -399,9 +401,22 @@ export function createHprofService(runtime, options = {}) {
     },
 
     ui: {
+      manifest() {
+        return UI_MANIFEST
+      },
       state(params = {}) {
         const dumpId = asDumpId(params.dump_id) ?? runtime.list().at(-1)?.dump_id
-        return ui.getState(dumpId, params.client_id)
+        const result = ui.getState(dumpId, params.client_id)
+        const available = UI_MANIFEST.actions.map((action) => action.name)
+        return {
+          ...result,
+          available_actions: available,
+          state: result.state === null ? null : { ...result.state, available_actions: available },
+          panels: (result.panels ?? []).map((panel) => ({
+            ...panel,
+            state: panel.state === null ? null : { ...panel.state, available_actions: available },
+          })),
+        }
       },
       command(params = {}) {
         const dumpId = asDumpId(params.dump_id) ?? runtime.list().at(-1)?.dump_id

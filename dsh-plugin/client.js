@@ -853,7 +853,7 @@ window.__ModuleLoader__.load({
               }, `${index === 0 ? '' : '↳ '}${step.className}${step.id === 0 ? '' : ` @ ${hexId(step.id)}`}${step.via ? `  —(${step.via})→` : ''}`)))))
     }
 
-    function ClassPathsTab({ dumpId, classInfo, onBack, onObject, treeCommand, onTreeChange }) {
+    function ClassPathsTab({ dumpId, classInfo, onBack, onObject, treeCommand, onTreeChange, weakRequest }) {
       const PAGE_SIZE = 10
       const UNREACHABLE_SIZE = 50
       const [weak, setWeak] = useState(false)
@@ -862,6 +862,10 @@ window.__ModuleLoader__.load({
       const [page, setPage] = useState(0)
       const [showUnreachable, setShowUnreachable] = useState(true)
       const [unreachablePage, setUnreachablePage] = useState(0)
+      useEffect(() => {
+        if (weakRequest === null || weakRequest === undefined) return
+        if (typeof weakRequest.weak === 'boolean') setWeak(weakRequest.weak)
+      }, [weakRequest])
       const result = useFetch(dumpId && classInfo
         ? `${API}/classpaths?dump_id=${encodeURIComponent(dumpId)}&class_id=${classInfo.id}&kind=${classInfo.kind ?? 'class'}&page=${page}&size=${PAGE_SIZE}${weak ? '&weak=1' : ''}`
         : null, { cache: true })
@@ -1900,6 +1904,7 @@ window.__ModuleLoader__.load({
       const [treeExpanded, setTreeExpanded] = useState([])
       const [classPathCollapsed, setClassPathCollapsed] = useState([])
       const [treeCommand, setTreeCommand] = useState(null)
+      const [weakRequest, setWeakRequest] = useState(null)
       const [chatDraftCommand, setChatDraftCommand] = useState(null)
       const [mountNonce, setMountNonce] = useState(0)
       const viewStorageRef = useRef(null)
@@ -2101,6 +2106,9 @@ window.__ModuleLoader__.load({
                 setViewOverride({ table: 'classes', sort: params.sort })
                 setMountNonce((value) => value + 1)
                 setRowSelection(null)
+              } else if (command.action === 'setWeak' && typeof params.weak === 'boolean') {
+                setTab('classpaths')
+                setWeakRequest({ weak: params.weak, nonce: Date.now() })
               } else if (command.action === 'toggleNode' && params.view === 'classpaths'
                 && (typeof params.key === 'string'
                   || (Number.isSafeInteger(Number(params.index)) && Number(params.index) >= 0))) {
@@ -2422,7 +2430,7 @@ window.__ModuleLoader__.load({
       else if (tab === 'path') body = h(PathTab, { dumpId: activeDumpId, objectId: pathObjectId, onBack: () => setTab(returnTab) })
       else if (tab === 'classpaths') body = h(ClassPathsTab, {
         dumpId: activeDumpId, classInfo, onBack: () => setTab('classes'), onObject: openObject,
-        treeCommand, onTreeChange: handleClassPathTreeChange,
+        treeCommand, onTreeChange: handleClassPathTreeChange, weakRequest,
       })
       else if (tab === 'referrers') body = h(ReferrersTab, {
         key: tabMountKey,

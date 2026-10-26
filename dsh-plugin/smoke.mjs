@@ -204,6 +204,19 @@ try {
     params: { action: 'draftMessage', params: { text: 'smoke draft' } },
   })
   assert.equal(draftCommand.action, 'draftMessage')
+  const manifest = await call('hprof_ui', { action: 'manifest' })
+  assert.ok(manifest.actions.some((action) => action.name === 'showClassPaths'))
+  const uiOpen = await call('hprof_ui', {
+    action: 'showClassPaths',
+    class_id: surface.id,
+    class_name: 'android.view.SurfaceControl',
+    weak: true,
+  })
+  assert.equal(uiOpen.commands.length, 3)
+  assert.deepEqual(uiOpen.commands.map((command) => command.action), ['selectClass', 'selectTab', 'setWeak'])
+  assert.equal(typeof uiOpen.warning, 'string')
+  const uiState = await call('hprof_ui', { action: 'state' })
+  assert.ok(uiState.available_actions.includes('showUnreachable'))
   console.log(`hprof_api: ${Object.keys(capabilities.operations).length} ops, fields projection + paths + classes pagination + ui commands ok`)
 
   const ptc = await call('hprof_ptc', {

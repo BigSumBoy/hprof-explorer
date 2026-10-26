@@ -87,6 +87,7 @@ pnpm dsh plugin --profile web add link:D:/src/hprof-explorer/dsh-plugin
 | `hprof_api(op, params)` | **通用服务入口**：entity/query/paths/analyze/dump，先 `op: "capabilities"` 看完整操作清单 |
 | `hprof_ptc(code)` | 在隔离子进程里执行 JS，注入 typed `hprof` namespace；plan-B 本地 runner |
 | `hprof_annotate(action, ...)` | 创建/列出/更新/删除 finding；target 支持 object/class/path/field/dump |
+| `hprof_ui(action, ...)` | 扁平、类型化的 UI 操作入口；`showClassPaths`/`showUnreachable` 等高层动作，`action="manifest"` 查看完整目录 |
 | `hprof_open(path)` | 解析并打开 dump，返回 `dump_id`、计数、Top 类、Top Retained |
 | `hprof_classes(query?, sort?, limit?)` | 类直方图，带 `id` / `kind` |
 | `hprof_instances(class_id, kind?, ...)` | 某类对象分页；数组类型用 `kind: 'primitive'` |
@@ -165,9 +166,22 @@ hprof_api(op="ui.command", params={action:"draftMessage", params:{text:"总结�
 hprof_api(op="ui.events", params={limit:50})
 ```
 
-命令：`selectTab`、`selectRow`、`setFilters`、`setPage`、`setSort`、`toggleNode`、`selectObject`、`selectClass`、`openDump`、`closeDump`、`closeDrawer`、`refresh`、`runReport`、`draftMessage`、`notice`。
+命令：`selectTab`、`selectRow`、`setFilters`、`setPage`、`setSort`、`setWeak`、`toggleNode`、`selectObject`、`selectClass`、`openDump`、`closeDump`、`closeDrawer`、`refresh`、`runReport`、`draftMessage`、`notice`。
 
-`selectRow` 参数 `{table, id}`；`setFilters` 参数 `{tab, filters}`，会 remount 当前过滤 tab 并应用新条件；`setPage` 参数 `{tab, page}`；`setSort` 参数 `{tab:"classes", sort:"bytes"|"count"|"name"}`；`toggleNode` 参数 `{id}` 切换支配树节点，或 `{view:"classpaths", key}` 切换类 GC 路径树节点；`draftMessage` 只填底部 Chat 草稿、不发送；`openDump` 带 `path` 时走真正的打开流程，带 `dump_id` 时只切换选择；`refresh`/`runReport`/`closeDump` 调用对应的 UI 操作。
+`selectRow` 参数 `{table, id}`；`setFilters` 参数 `{tab, filters}`，会 remount 当前过滤 tab 并应用新条件；`setPage` 参数 `{tab, page}`；`setSort` 参数 `{tab:"classes", sort:"bytes"|"count"|"name"}`；`setWeak` 参数 `{weak}`；`toggleNode` 参数 `{id}` 切换支配树节点，或 `{view:"classpaths", key|index}` 切换类 GC 路径树节点；`draftMessage` 只填底部 Chat 草稿、不发送；`openDump` 带 `path` 时走真正的打开流程，带 `dump_id` 时只切换选择；`refresh`/`runReport`/`closeDump` 调用对应的 UI 操作。
+
+### 模型优先用 hprof_ui
+
+`hprof_ui` 是同一批 `ui.command` 的扁平类型化投影，其他电脑上的模型不需要读源码：
+
+```text
+hprof_ui(action="manifest")
+hprof_ui(action="state")
+hprof_ui(action="showClassPaths", class_id=1877222656, class_name="android.view.SurfaceControl", weak=true)
+hprof_ui(action="showUnreachable", class_id=1877222656)
+```
+
+`showClassPaths` 会展开成 `selectClass → selectTab classpaths → setWeak?`，返回命令 id；它不复制 UI 逻辑。底层 `hprof_api(op="ui.command")` 和 PTC 的 `hprof.ui.command` 仍然保留，作为完整 escape hatch。`ui.state` 返回 `available_actions`，`ui.manifest` 返回每个 action 的参数、示例和展开步骤。
 
 `row` 是当前表格选中的 `{table, id, className}`；`filters` 是当前 tab 的过滤条件；`page`/`sort` 是当前分页/排序；`tree.expanded`/`tree.collapsed` 是支配树/类路径树的展开与折叠状态。真正写入 `SessionEventMap` 还需要 Host 侧 session-event seam，当前先用 UI event ledger 代替。
 
@@ -312,7 +326,7 @@ node dsh-plugin/client-smoke.mjs
 CLIENT SMOKE OK
 ```
 
-Smoke 覆盖：引擎协议、17 个工具（diff 用合成 profile 验证聚合）、`class_stats` 的 native/released 聚合、`class_paths` 分页与 holder id、`hprof_api` 的 query/entity/paths/analyze 投影、`hprof_ptc` 的绑定调用/日志/错误隔离、`hprof_annotate` 的持久化 CRUD、`/hprof-api` 的 dumps/summary/classes/object/path/domtree/strings/roots/referrers/findings/ui-state/ui-events/report、Client 的 tab 类型、guide、body、composer、`main` 工作区、`hprof.conversation` 与 `sidebar.panellist` 注册。工作区的 Chat 渲染、拖拽分隔、表格选中/过滤上报需要在浏览器里人工验证。
+Smoke 覆盖：引擎协议、18 个工具（diff 用合成 profile 验证聚合）、`class_stats` 的 native/released 聚合、`class_paths` 分页与 holder id、`hprof_api` 的 query/entity/paths/analyze 投影、`hprof_ui` 的 manifest/高层动作展开、`hprof_ptc` 的绑定调用/日志/错误隔离、`hprof_annotate` 的持久化 CRUD、`/hprof-api` 的 dumps/summary/classes/object/path/domtree/strings/roots/referrers/findings/ui-state/ui-events/report、Client 的 tab 类型、guide、body、composer、`main` 工作区、`hprof.conversation` 与 `sidebar.panellist` 注册。工作区的 Chat 渲染、拖拽分隔、表格选中/过滤上报需要在浏览器里人工验证。
 
 ## 限制
 

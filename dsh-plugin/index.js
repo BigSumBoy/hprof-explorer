@@ -746,6 +746,154 @@ export function createToolDefinitions(runtime, options = {}) {
       },
     }),
     definition({
+      name: 'hprof_ui',
+      description:
+        'Control the HPROF Web workspace. Prefer showClassPaths / showUnreachable over sequence-guessing '
+        + 'with low-level commands. Call action="manifest" for the exact action catalog, or action="state" '
+        + 'for the live panel state. The generic hprof_api op="ui.command" remains available as the low-level '
+        + 'escape hatch. Commands are queued for a reporting panel; the result lists queued command ids and '
+        + 'warns when no panel is open.',
+      required: ['action'],
+      properties: {
+        action: {
+          type: 'string',
+          enum: [
+            'state', 'manifest', 'showClassPaths', 'showUnreachable', 'selectTab', 'selectClass',
+            'selectObject', 'selectRow', 'setFilters', 'setPage', 'setSort', 'toggleDominatorNode',
+            'toggleClassPathNode', 'setWeak', 'draftMessage', 'refresh', 'runReport', 'closeDump',
+            'closeDrawer', 'openDump', 'notice',
+          ],
+        },
+        dump_id: DUMP_ID,
+        client_id: { type: 'string', description: 'Target panel client id; omit to use the first reporting panel.' },
+        class_id: { type: 'number', description: 'Class id from hprof_classes.' },
+        class_name: { type: 'string', description: 'Optional class name for the object header.' },
+        object_id: { type: 'number', description: 'Object id for selectObject.' },
+        table: {
+          type: 'string',
+          enum: ['classes', 'instances', 'retained', 'strings', 'roots', 'referrers'],
+          description: 'Table for selectRow.',
+        },
+        row_id: { type: 'number', description: 'Row object/class id for selectRow.' },
+        tab: { type: 'string', description: 'Analysis tab, for example classes, roots, classpaths, domtree.' },
+        filters: { type: 'object', description: 'Filter values for setFilters; inspect state.filters for keys.' },
+        page: { type: 'number', description: 'Zero-based page for setPage.' },
+        sort: { type: 'string', enum: ['bytes', 'count', 'name'], description: 'Class table sort for setSort.' },
+        node_id: { type: 'number', description: 'Dominator-tree node id for toggleDominatorNode.' },
+        node_key: { type: 'string', description: 'Class-path tree key for toggleClassPathNode.' },
+        node_index: { type: 'number', description: 'Visible class-path tree row index for toggleClassPathNode.' },
+        weak: { type: 'boolean', description: 'Weak-reference switch for showClassPaths / setWeak.' },
+        text: { type: 'string', description: 'Chat draft or notice text.' },
+        path: { type: 'string', description: 'HPROF path for openDump.' },
+      },
+      async execute(args, exec) {
+        const action = asString(args?.action, 'action')
+        const dumpId = asOptionalString(args?.dump_id)
+        const clientId = asOptionalString(args?.client_id)
+        if (action === 'state') {
+          return service.dispatch('ui.state', { dump_id: dumpId, client_id: clientId }, exec)
+        }
+        if (action === 'manifest') return service.dispatch('ui.manifest', {}, exec)
+
+        const requests = []
+        const enqueue = (name, params) => requests.push({ action: name, params })
+        if (action === 'showClassPaths' || action === 'showUnreachable') {
+          const classId = asId(args?.class_id, 'class_id')
+          enqueue('selectClass', {
+            id: classId,
+            name: asOptionalString(args?.class_name) ?? `class ${classId}`,
+          })
+          enqueue('selectTab', { tab: 'classpaths' })
+          if (typeof args?.weak === 'boolean') enqueue('setWeak', { weak: args.weak })
+        } else if (action === 'selectTab') {
+          enqueue('selectTab', { tab: asString(args?.tab, 'tab') })
+        } else if (action === 'selectClass') {
+          const classId = asId(args?.class_id, 'class_id')
+          enqueue('selectClass', {
+            id: classId,
+            name: asOptionalString(args?.class_name) ?? `class ${classId}`,
+          })
+        } else if (action === 'selectObject') {
+          enqueue('selectObject', { id: asId(args?.object_id, 'object_id') })
+        } else if (action === 'selectRow') {
+          enqueue('selectRow', { table: asString(args?.table, 'table'), id: asId(args?.row_id, 'row_id') })
+        } else if (action === 'setFilters') {
+          if (args?.filters === null || typeof args?.filters !== 'object') throw new Error('filters must be an object')
+          enqueue('setFilters', { tab: asString(args?.tab, 'tab'), filters: args.filters })
+        } else if (action === 'setPage') {
+          const page = Number(args?.page)
+          if (!Number.isSafeInteger(page) || page < 0) throw new Error('page must be a non-negative integer')
+          enqueue('setPage', { tab: asString(args?.tab, 'tab'), page })
+        } else if (action === 'setSort') {
+          enqueue('setSort', { sort: asString(args?.sort, 'sort') })
+        } else if (action === 'toggleDominatorNode') {
+          enqueue('toggleNode', { id: asId(args?.node_id, 'node_id') })
+        } else if (action === 'toggleClassPathNode') {
+          const key = asOptionalString(args?.node_key)
+          const index = Number(args?.node_index)
+          if (key === undefined && !Number.isSafeInteger(index)) {
+            throw new Error('toggleClassPathNode needs node_key or node_index')
+          }
+          enqueue('toggleNode', {
+            view: 'classpaths',
+            ...(key === undefined ? {} : { key }),
+            ...(key === undefined ? { index } : {}),
+          })
+        } else if (action === 'setWeak') {
+          if (typeof args?.weak !== 'boolean') throw new Error('weak must be a boolean')
+          enqueue('setWeak', { weak: args.weak })
+        } else if (action === 'draftMessage') {
+          enqueue('draftMessage', { text: asString(args?.text, 'text') })
+        } else if (action === 'refresh') {
+          enqueue('refresh', {})
+        } else if (action === 'runReport') {
+          enqueue('runReport', {})
+        } else if (action === 'closeDump') {
+          enqueue('closeDump', {})
+        } else if (action === 'closeDrawer') {
+          enqueue('closeDrawer', {})
+        } else if (action === 'openDump') {
+          const path = asOptionalString(args?.path)
+          if (path === undefined) throw new Error('openDump needs path')
+          enqueue('openDump', { path })
+        } else if (action === 'notice') {
+          enqueue('notice', { text: asString(args?.text, 'text') })
+        } else {
+          throw new Error(`unknown UI action "${action}"; call action="manifest"`)
+        }
+
+        const snapshot = await service.dispatch('ui.state', { dump_id: dumpId, client_id: clientId }, exec)
+        const panels = snapshot.panels ?? []
+        if (clientId !== undefined && !panels.some((panel) => panel.client_id === clientId)) {
+          const ids = panels.map((panel) => panel.client_id).filter(Boolean).join(', ')
+          throw new Error(`unknown client_id "${clientId}"; reporting panels: ${ids || '(none)'}`)
+        }
+        const commands = []
+        for (const request of requests) {
+          commands.push(await service.dispatch('ui.command', {
+            dump_id: dumpId,
+            client_id: clientId,
+            action: request.action,
+            params: request.params,
+          }, exec))
+        }
+        return {
+          action,
+          commands,
+          queued: true,
+          warning: panels.length === 0
+            ? 'No HPROF panel is reporting; commands are queued. Open the HPROF workspace and select the dump.'
+            : undefined,
+          panels: panels.map((panel) => ({
+            client_id: panel.client_id,
+            panel: panel.state?.panel ?? null,
+            tab: panel.state?.tab ?? null,
+          })),
+          state: snapshot.state,
+        }
+      },
+    }),
+    definition({
       name: 'hprof_open',
       description:
         'Open an Android/ART HPROF heap dump (from `am dumpheap`) and return a dump_id with counts, '

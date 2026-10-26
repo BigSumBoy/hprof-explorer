@@ -15,6 +15,7 @@ const ACTIONS = new Set([
   'setFilters',
   'setPage',
   'setSort',
+  'setWeak',
   'toggleNode',
   'selectObject',
   'selectClass',

@@ -31,6 +31,7 @@ DSH Host
        ├─ engine.mjs        one parser child process per open dump
        ├─ findings.mjs      durable findings keyed by dump file
        ├─ ui-state.mjs      per-panel state, commands, event ledger
+       ├─ ui-manifest.mjs   model-facing UI action catalog
        ├─ ptc.mjs           host side of the plugin-local program runner
        ├─ ptc-runner.mjs    isolated vm runner
        └─ client.js         native main panel, sidebar tab, Chat
@@ -42,7 +43,7 @@ The plugin does not start `src/server.mjs`. The Host owns the lifecycle; the par
 
 ## Service first
 
-`service.mjs` is the source of truth. Its manifest currently exposes 28 operations:
+`service.mjs` is the source of truth. Its manifest currently exposes 29 operations:
 
 ```text
 dump.open/list/close/summary
@@ -51,14 +52,14 @@ query.classes/instances/strings/roots/retained
 paths.object/class
 analyze.classStats/diff/report
 findings.create/list/update/delete
-ui.state/command/events
+ui.state/manifest/command/events
 ```
 
 All consumers project this surface:
 
 | Consumer | Projection |
 |---|---|
-| Model | generic `hprof_api` plus convenience tools (17 tools total) |
+| Model | generic `hprof_api`, flat `hprof_ui` actions, convenience tools (18 tools total) |
 | PTC | `hprof.<group>.<method>` namespace generated from the manifest |
 | Web UI | `/hprof-api` routes and client components |
 | Reports | service `analyze.report` includes findings |
@@ -104,6 +105,7 @@ selectRow
 setFilters
 setPage
 setSort
+setWeak
 toggleNode
 selectObject
 selectClass
@@ -117,6 +119,8 @@ notice
 ```
 
 `draftMessage` fills the bottom Chat composer without sending. The main workspace's embedded Conversation has its own composer and is not filled by this command.
+
+`hprof_ui` is the model-first projection over these commands. It uses flat parameters and a closed action enum; high-level actions such as `showClassPaths` and `showUnreachable` expand into the low-level commands above. The low-level `hprof_api` `ui.command` and PTC `hprof.ui.command` remain the complete escape hatch. `ui.manifest` returns the action catalog, and `ui.state` includes `available_actions` and panel ids.
 
 A bounded in-memory event ledger records state reports, command enqueue, and delivery. It is diagnostic, not a session log.
 
@@ -169,13 +173,15 @@ node dsh-plugin/client-smoke.mjs
 node dsh-plugin/smoke.mjs
 ```
 
-They cover the engine protocol, 17 tools, findings CRUD, report findings section, PTC success/error/timeout, API routes, per-panel UI state, client registration, complete class-path group paging beyond the old 100-group cap, and the default-disabled idle close.
+They cover the engine protocol, 18 tools, findings CRUD, report findings section, PTC success/error/timeout, API routes, per-panel UI state, client registration, complete class-path group paging beyond the old 100-group cap, and the default-disabled idle close.
 
 Live browser verification has covered:
 
 - row selection, filters, page, sort;
 - class-path tree collapse;
 - class-path counts and unreachable list on a 164 MB dump: 5339 total, 1865 weak-reachable, 3474 unreachable, 1437 groups; group page 1436 returned the final group;
+- `hprof_ui` manifest and high-level `showClassPaths` expansion, including `setWeak`, applied by the live sidebar panel;
+- `ui.state` exposing `available_actions`;
 - cross-panel command targeting;
 - Chat draft filling without sending;
 - report containing five findings.
