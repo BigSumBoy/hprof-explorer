@@ -102,7 +102,7 @@ pnpm dsh plugin --profile web add link:D:/src/hprof-explorer/dsh-plugin
 | `hprof_report(dump_id?, out_path?)` | 生成 Markdown 报告并写入文件 |
 | `hprof_close(dump_id?)` | 结束引擎进程，释放内存 |
 
-结果在渲染时截断到 7000 字符；`class_paths` 分页（默认 10 组/页，最多 10），每组返回紧凑的 `chain` 字符串和最多 5 个 `{id, holderId}` 样本，不再固定截断为 10 组；`class_stats` 默认保留前 10 个创建点和前 10 个 holder 分类，完整引用链用 `class_paths` 翻页拿。
+结果在渲染时截断到 7000 字符；`class_paths` 分页（默认 10 组/页，最多 10），每组返回紧凑的 `chain` 字符串和最多 5 个 `{id, holderId}` 样本；现在分页会覆盖全部组，不再在 100 组处截断；返回同时带 `totalObjects/reachable/unreachable/groupCount` 和最多 5 个不可达样本。`class_stats` 默认保留前 10 个创建点和前 10 个 holder 分类，完整引用链用 `class_paths` 翻页拿。UI 的类 GC 路径页会显示总数/可达/不可达，并单独列出不可达对象（分页，可点开对象详情）。
 
 ## 通用服务（hprof_api）
 
@@ -240,7 +240,7 @@ tab 内布局：
 - **类**：排序、多条件过滤，点击进入对象列表；行内“GC 路径”；
 - **对象抽屉**：String 内容、字段/数组、Shallow/Retained、支配者；引用可点击跳转；GC 路径/引用查询/支配子树/类路径入口；
 - **GC 路径**：最短链，支持包含弱引用；
-- **类路径**：树形/文本两种视图，弱引用开关；
+- **类路径**：树形/文本两种视图，弱引用开关，完整组翻页；顶部显示总数/可达/不可达，并可展开查看不可达对象明细（无 GC Root 路径，可点开对象详情）；
 - **Retained**：排行、id/类名/最小 Retained 过滤、分页；
 - **字符串**：id/内容搜索、最小长度、只看可读文本、分页；
 - **Roots**：按 id/根类型/类名/堆过滤，点击进入对象；
@@ -271,9 +271,19 @@ tab 内布局：
 | `startTimeoutMs` | `180000` | 解析 + 支配树的上限 |
 | `requestTimeoutMs` | `60000` | 单个查询上限 |
 | `profileTimeoutMs` | `180000` | 差分时取类 profile 的上限 |
-| `idleTimeoutMs` | `900000` | 闲置自动关闭 |
+| `idleTimeoutMs` | `0` | 闲置自动关闭；`0` 表示不自动关闭；正数毫秒 |
 | `maxPageSize` | `200` | 列表上限 |
 | `workspaceRoot` | 进程 cwd | 无会话 cwd 时相对路径的基准 |
+
+默认不因空闲关闭 dump，适合长时间分析。需要自动回收时在 profile 的 `cordis.patch.yml` 覆盖：
+
+```yaml
+- id: hprof-explorer
+  config:
+    idleTimeoutMs: 3600000
+```
+
+`maxDumps` 仍默认 3；超过时按最久未用淘汰。
 
 ## 已验证
 
@@ -311,7 +321,7 @@ Smoke 覆盖：引擎协议、17 个工具（diff 用合成 profile 验证聚合
 - **阻塞式 open**：解析和支配树同步跑在引擎里，`hprof_open` 会等到 ready；取消 turn 会中止等待并杀掉引擎。
 - **直接 spawn**：没走 `ctx.subprocess` seam，不继承沙箱/SSH；这是本地工具的取舍。
 - **tab 选中状态不持久化**：dump 选择在 tab 内，刷新后回到第一个已打开的 dump；`params.dumpId` 只在打开时生效。工作区的 dump 选择是面板内状态。
-- **dump_id 是运行时实例编号**：`dump-N` 不是文件版本；每次重新拉起引擎都会分配新编号，所以同一文件重开后会递增。Host 重启、引擎闲置超时（默认 15 分钟，按最后一次查询续期）或被 `maxDumps` 淘汰后，旧编号就无效了。面板监听 `connection/reset` 和 `unknown dump_id` 错误，自动刷新 `/dumps`、切换或清空选择；最近一次成功打开的路径存在 `localStorage`，列表为空时会自动重新解析（大 dump 约几秒），但**每个页面会话/每次重连后最多自动恢复一次**，之后显示「重新打开」横幅，避免每次进入面板都静默新建一个 dump。手动关闭 dump 会清掉这个路径。
+- **dump_id 是运行时实例编号**：`dump-N` 不是文件版本；每次重新拉起引擎都会分配新编号，所以同一文件重开后会递增。Host 重启、显式配置的引擎闲置超时（默认关闭，按最后一次查询续期）或被 `maxDumps` 淘汰后，旧编号就无效了。面板监听 `connection/reset` 和 `unknown dump_id` 错误，自动刷新 `/dumps`、切换或清空选择；最近一次成功打开的路径存在 `localStorage`，列表为空时会自动重新解析（大 dump 约几秒），但**每个页面会话/每次重连后最多自动恢复一次**，之后显示「重新打开」横幅，避免每次进入面板都静默新建一个 dump。手动关闭 dump 会清掉这个路径。
 - **工作区的 Chat 依赖当前选中会话**：没有选中会话时右列显示占位；权限审批、图片、完整工具卡片在右列（完整 Chat）里直接出现，不再是摘要。
 - **侧栏 tab 的紧凑对话**：仍走 `insertText` + `submit`，主输入框已有草稿时会追加；完整对话请用主工作区。
 - **扩展工具需要重载**：在对话里让我改插件代码可以，但 Host 侧的 `index.js`/`engine.mjs` 改动要重启 DSH 才生效；临时查询可以用现有工具或 PTC，持久的新工具建议在创造模式里做成 bundle 安装。

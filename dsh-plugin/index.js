@@ -38,7 +38,7 @@ const DEFAULTS = {
   startTimeoutMs: 180_000,
   requestTimeoutMs: 60_000,
   profileTimeoutMs: 180_000,
-  idleTimeoutMs: 15 * 60_000,
+  idleTimeoutMs: 0,
   maxPageSize: 200,
   workspaceRoot: undefined,
 }
@@ -111,9 +111,14 @@ export function createHprofRuntime(config = {}) {
 
   function touch(rec) {
     rec.lastUsed = Date.now()
-    if (rec.timer !== undefined) clearTimeout(rec.timer)
-    rec.timer = setTimeout(() => stop(rec), cfg.idleTimeoutMs)
-    rec.timer.unref?.()
+    if (rec.timer !== undefined) {
+      clearTimeout(rec.timer)
+      rec.timer = undefined
+    }
+    if (cfg.idleTimeoutMs > 0) {
+      rec.timer = setTimeout(() => stop(rec), cfg.idleTimeoutMs)
+      rec.timer.unref?.()
+    }
   }
 
   function stop(rec) {
@@ -747,7 +752,8 @@ export function createToolDefinitions(runtime, options = {}) {
         + 'top classes by bytes, and top objects by retained size. Call this before any other hprof_* tool. '
         + 'Parsing and dominator analysis run in a separate Node process and can take several seconds and '
         + 'about 1 GB for a 129 MB dump. Pass an absolute path or one relative to the workspace. The dump '
-        + 'stays open until hprof_close, the idle timeout, or eviction by a newer dump.',
+        + 'stays open until hprof_close, an explicitly configured idle timeout, or eviction by a newer dump '
+        + '(default max 3 open dumps).',
       required: ['path'],
       properties: {
         path: { type: 'string', description: 'Path to an extracted .hprof file (not a .zip).' },
@@ -869,16 +875,14 @@ export function createToolDefinitions(runtime, options = {}) {
         size: { type: 'number', description: 'Groups per page, 1-10 (default 10); 10 compact chains fit one tool result.' },
       },
       async execute(args, exec) {
-        const rec = runtime.pickDump(args?.dump_id)
-        const page = Math.max(0, Math.floor(Number(args?.page) || 0))
-        const size = Math.min(10, Math.max(1, Math.floor(Number(args?.size) || 10)))
-        const result = await runtime.call(rec, 'classPaths', {
-          class_id: asId(args?.class_id, 'class_id'),
-          kind: args?.kind === 'primitive' ? 'primitive' : 'class',
-          weak: args?.weak === true,
-          include_holders: true,
-        }, { signal: exec?.signal })
-        return trimClassPaths(result, page, size)
+        return service.dispatch('paths.class', {
+          dump_id: args?.dump_id,
+          class_id: args?.class_id,
+          kind: args?.kind,
+          weak: args?.weak,
+          page: args?.page,
+          size: args?.size,
+        }, exec)
       },
     }),
     definition({
@@ -1157,33 +1161,6 @@ function trimObjectDetail(detail) {
     out.class = { ...out.class, statics: out.class.statics.slice(0, 200), statics_truncated: true }
   }
   return out
-}
-
-function trimClassPaths(result, page = 0, size = 10) {
-  const all = Array.isArray(result.groups) ? result.groups : []
-  const start = page * size
-  const groups = all.slice(start, start + size).map((group) => {
-    const steps = Array.isArray(group.steps) ? group.steps : []
-    const chain = steps
-      .map((step, index) => (index === 0 ? '<root>' : `${step.className}${step.via ? ` <- ${step.via}` : ''}`))
-      .join(' | ')
-    return {
-      count: group.count,
-      shallow: group.shallow,
-      chain,
-      samples: Array.isArray(group.samples) ? group.samples.slice(0, 5) : [],
-    }
-  })
-  return {
-    ...result,
-    groups,
-    groupCount: result.groupCount ?? all.length,
-    availableGroups: all.length,
-    page,
-    size,
-    returned: groups.length,
-    hasMore: start + groups.length < all.length,
-  }
 }
 
 function trimClassStats(result) {

@@ -1282,7 +1282,7 @@ export class HprofIndex {
   }
 
   /** GC-root path groups for every object of one class (MAT "Path to GC Roots" style). */
-  classPaths(kind, id, limitObjects = 20000, maxGroups = 100, includeWeak = false) {
+  classPaths(kind, id, limitObjects = 20000, maxGroups = 100, includeWeak = false, groupOffset = 0) {
     if (!this.bfsParent) return null;
     const parents = includeWeak ? this.allBfsParent : this.bfsParent;
     const dist = includeWeak ? this.allBfsDist : this.bfsDist;
@@ -1290,6 +1290,7 @@ export class HprofIndex {
     const ids = this.members.get(key) ?? [];
     const className = kind === 'primitive' ? primName(id) : this.className(id);
     const groups = new Map();
+    const unreachableItems = [];
     let scanned = 0;
     let unreachable = 0;
     const limit = Math.min(ids.length, limitObjects);
@@ -1298,6 +1299,7 @@ export class HprofIndex {
       const v = this.nodeIndex.get(objectId);
       if (v == null || dist[v] < 0) {
         unreachable++;
+        unreachableItems.push({ id: objectId, shallow: v == null ? null : this.shallow[v] });
         continue;
       }
       const chain = [];
@@ -1310,6 +1312,7 @@ export class HprofIndex {
       }
       if (cur !== 0) {
         unreachable++;
+        unreachableItems.push({ id: objectId, shallow: this.shallow[v] });
         continue;
       }
       chain.push(0);
@@ -1330,6 +1333,7 @@ export class HprofIndex {
       scanned++;
     }
     const list = [...groups.values()].sort((a, b) => b.count - a.count);
+    const offset = Math.max(0, Math.min(groupOffset, list.length));
     return {
       kind,
       id,
@@ -1339,9 +1343,11 @@ export class HprofIndex {
       scanned,
       reachable: scanned,
       unreachable,
+      unreachableItems,
       sampled: ids.length > limit,
       groupCount: list.length,
-      groups: list.slice(0, maxGroups),
+      groupOffset: offset,
+      groups: list.slice(offset, offset + maxGroups),
     };
   }
 

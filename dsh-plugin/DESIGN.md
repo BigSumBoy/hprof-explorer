@@ -141,7 +141,7 @@ Findings support object, class, path, field, and dump targets. They have severit
 ## Resource lifecycle
 
 - One parser child per open dump.
-- Idle dumps are closed after the configured timeout (default 15 minutes).
+- Idle dumps stay open by default; set `idleTimeoutMs` to a positive millisecond value to enable idle closure.
 - Dump ids are runtime handles; findings are keyed by file identity.
 - Host disposal closes engines and rejects pending requests.
 - PTC always uses a short-lived child and never shares the parser process.
@@ -150,7 +150,7 @@ A 129 MB SystemUI dump uses roughly 0.9 GB in the parser child. Dump count defau
 
 ## Bounds and safety
 
-- Class paths are returned as compact chains, at most 10 groups per page.
+- Class paths are returned as compact chains, at most 10 groups per page; the engine pages the complete group list instead of hard-capping it at 100. The service response includes total, reachable, unreachable and up to five unreachable samples; the UI shows the full unreachable list in a separate paginated section.
 - Instances and arrays page; instances support field projection.
 - `class_stats` trims callsites and holder categories.
 - Tool results are rendered with a 7000-character cap; the service must still paginate so the cap does not hide necessary data.
@@ -169,12 +169,13 @@ node dsh-plugin/client-smoke.mjs
 node dsh-plugin/smoke.mjs
 ```
 
-They cover the engine protocol, 17 tools, findings CRUD, report findings section, PTC success/error/timeout, API routes, per-panel UI state, and client registration.
+They cover the engine protocol, 17 tools, findings CRUD, report findings section, PTC success/error/timeout, API routes, per-panel UI state, client registration, complete class-path group paging beyond the old 100-group cap, and the default-disabled idle close.
 
 Live browser verification has covered:
 
 - row selection, filters, page, sort;
 - class-path tree collapse;
+- class-path counts and unreachable list on a 164 MB dump: 5339 total, 1865 weak-reachable, 3474 unreachable, 1437 groups; group page 1436 returned the final group;
 - cross-panel command targeting;
 - Chat draft filling without sending;
 - report containing five findings.
@@ -183,6 +184,7 @@ Not verified in this environment:
 
 - Linux execution end to end;
 - a real-browser automated composition test;
+- a 15-minute idle soak with `idleTimeoutMs` explicitly configured;
 - true session-event replay.
 
 ## Installation

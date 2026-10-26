@@ -25,6 +25,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const appDir = path.resolve(here, '..')
 const dump = findDump()
 const runtime = createHprofRuntime({ appDir, workspaceRoot: appDir })
+assert.equal(runtime.config.idleTimeoutMs, 0, 'idle close must be disabled by default')
 const tools = new Map(createToolDefinitions(runtime).map((tool) => [tool.name, tool]))
 const exec = { signal: new AbortController().signal }
 
@@ -62,7 +63,22 @@ try {
   assert.equal(classPaths.groups[0].signature, undefined, 'signature must be trimmed from model output')
   assert.equal(classPaths.groups[0].steps, undefined, 'paths must be compact chain strings')
   assert.ok(typeof classPaths.groups[0].chain === 'string' && classPaths.groups[0].chain.includes('<-'))
+  assert.ok(classPaths.reachable + classPaths.unreachable <= classPaths.totalObjects)
+  assert.ok(typeof classPaths.unreachable === 'number')
+  assert.ok(classPaths.totalObjects <= target.count)
   console.log(`class_paths: ${classPaths.groupCount ?? classPaths.groups.length} groups`)
+
+  const deepPage = await call('hprof_class_paths', {
+    dump_id: opened.dump_id,
+    class_id: target.id,
+    kind: target.kind,
+    page: 50,
+    size: 10,
+  })
+  assert.ok(deepPage.groups.length > 0, 'class path pagination must go beyond the old 100-group cap')
+  assert.equal(deepPage.page, 50)
+  assert.equal(deepPage.hasMore, deepPage.page * deepPage.size + deepPage.groups.length < deepPage.groupCount)
+  console.log(`class_paths deep page: ${deepPage.groups.length} groups at page ${deepPage.page}`)
 
   const surfaceClasses = await call('hprof_classes', {
     dump_id: opened.dump_id,

@@ -152,8 +152,13 @@ const methods = {
     const kind = params.kind === 'primitive' ? 'primitive' : 'class'
     const id = Number(params.class_id)
     if (!Number.isSafeInteger(id) || id < 0) throw new Error('class_id must be a non-negative integer')
-    const result = idx.classPaths(kind, id, 20_000, 100, params.weak === true)
+    const page = clamp(params.page, 0, 0, 100_000)
+    const size = clamp(params.size, 100, 1, 100)
+    const result = idx.classPaths(kind, id, 20_000, size, params.weak === true, page * size)
     if (result === null) throw new Error('analysis not ready')
+    result.page = page
+    result.size = size
+    result.hasMore = result.groupOffset + result.groups.length < result.groupCount
     // Holder ids let the caller follow up with object() without re-walking paths.
     if (params.include_holders === true) {
       for (const group of result.groups) {
@@ -170,7 +175,7 @@ const methods = {
     const kind = params.kind === 'primitive' ? 'primitive' : 'class'
     const id = Number(params.class_id)
     if (!Number.isSafeInteger(id) || id < 0) throw new Error('class_id must be a non-negative integer')
-    const paths = idx.classPaths(kind, id, 20_000, 100, false)
+    const paths = idx.classPaths(kind, id, 20_000, 20_000, false)
     if (paths === null) throw new Error('analysis not ready')
     const ids = idx.members.get(kind === 'primitive' ? `p:${id}` : `c:${id}`) ?? []
     const callsites = new Map()

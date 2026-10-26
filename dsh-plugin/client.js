@@ -853,16 +853,23 @@ window.__ModuleLoader__.load({
               }, `${index === 0 ? '' : '↳ '}${step.className}${step.id === 0 ? '' : ` @ ${hexId(step.id)}`}${step.via ? `  —(${step.via})→` : ''}`)))))
     }
 
-    function ClassPathsTab({ dumpId, classInfo, onBack, treeCommand, onTreeChange }) {
+    function ClassPathsTab({ dumpId, classInfo, onBack, onObject, treeCommand, onTreeChange }) {
+      const PAGE_SIZE = 10
+      const UNREACHABLE_SIZE = 50
       const [weak, setWeak] = useState(false)
       const [mode, setMode] = useState('tree')
       const [collapsed, setCollapsed] = useState(() => new Set())
+      const [page, setPage] = useState(0)
+      const [showUnreachable, setShowUnreachable] = useState(true)
+      const [unreachablePage, setUnreachablePage] = useState(0)
       const result = useFetch(dumpId && classInfo
-        ? `${API}/classpaths?dump_id=${encodeURIComponent(dumpId)}&class_id=${classInfo.id}&kind=${classInfo.kind ?? 'class'}${weak ? '&weak=1' : ''}`
+        ? `${API}/classpaths?dump_id=${encodeURIComponent(dumpId)}&class_id=${classInfo.id}&kind=${classInfo.kind ?? 'class'}&page=${page}&size=${PAGE_SIZE}${weak ? '&weak=1' : ''}`
         : null, { cache: true })
       const data = result.data
       const treeCommandRef = useRef(null)
       useEffect(() => {
+        setPage(0)
+        setUnreachablePage(0)
         setCollapsed(new Set())
       }, [classInfo, weak])
       useEffect(() => {
@@ -890,6 +897,13 @@ window.__ModuleLoader__.load({
       if (classInfo === null) return h('div', { style: S.muted }, '请选择类')
       if (result.error !== null) return h('div', { style: S.error }, result.error)
       const treeRows = data === null ? [] : flattenClassPathTree(data.groups ?? [], collapsed)
+      const unreachableItems = data?.unreachableItems ?? []
+      const unreachableSlice = unreachableItems.slice(
+        unreachablePage * UNREACHABLE_SIZE,
+        (unreachablePage + 1) * UNREACHABLE_SIZE,
+      )
+      const groupPages = Math.max(1, Math.ceil((data?.groupCount ?? 0) / PAGE_SIZE))
+      const unreachablePages = Math.max(1, Math.ceil(unreachableItems.length / UNREACHABLE_SIZE))
       const toggleNode = (key) => setCollapsed((current) => {
         const next = new Set(current)
         if (next.has(key)) next.delete(key)
@@ -909,7 +923,7 @@ window.__ModuleLoader__.load({
           ? h('div', { style: S.muted }, '加载中…')
           : h('div', null,
             h('div', { style: S.hint },
-              `${data.totalObjects} 个对象 · 扫描 ${data.scanned} · 可达 ${data.reachable} · ${data.groupCount} 组`
+              `${data.totalObjects} 个对象 · 可达 ${data.reachable} · 不可达 ${data.unreachable} · ${data.groupCount} 组`
               + (data.sampled ? ' · 已采样' : '')),
             mode === 'tree'
               ? h('div', null, treeRows.map((row) => h('div', {
@@ -925,8 +939,42 @@ window.__ModuleLoader__.load({
                 h('div', { style: S.muted }, `${group.count} 个对象 · shallow ${formatBytes(group.shallow)}`),
                 h('div', { style: S.chain }, (group.steps ?? []).map((step, stepIndex) => h('div', {
                   key: stepIndex, style: S.chainLine,
-                }, `${stepIndex === 0 ? '' : '↳ '}${step.className}${step.via ? `  —(${step.via})→` : ''}`)))))
-      ))
+                }, `${stepIndex === 0 ? '' : '↳ '}${step.className}${step.via ? `  —(${step.via})→` : ''}`))))),
+            h('div', { style: { ...S.row, marginTop: 8 } },
+              h(Btn, { onClick: () => setPage((value) => Math.max(0, value - 1)), disabled: page === 0 }, '上一页'),
+              h('span', { style: S.muted }, `第 ${page + 1} / ${groupPages} 页`),
+              h(Btn, { onClick: () => setPage((value) => value + 1), disabled: !data.hasMore }, '下一页'),
+              h('span', { style: S.muted }, `本页 ${data.groups?.length ?? 0} 组`)),
+            h('div', { style: { marginTop: 14, borderTop: '1px solid var(--dsw-alias-border-l1)', paddingTop: 10 } },
+              h('div', { style: S.row },
+                h('span', { style: { fontWeight: 500 } }, `不可达对象 · ${data.unreachable}`),
+                h(Btn, { ghost: true, onClick: () => setShowUnreachable((value) => !value) },
+                  showUnreachable ? '收起' : '展开'),
+                h('span', { style: S.hint },
+                  data.unreachable === 0
+                    ? '没有不可达对象'
+                    : '这些对象没有强/弱 GC Root 路径，不会出现在上面的树里；只能作为对象查看。')),
+              showUnreachable && data.unreachable > 0
+                ? (unreachableItems.length === 0
+                  ? h('div', { style: S.muted }, '引擎没有返回不可达对象明细。')
+                  : h('div', null,
+                    h('div', { style: { display: 'flex', flexDirection: 'column', gap: 2, marginTop: 6 } },
+                      unreachableSlice.map((item) => h('div', {
+                        key: item.id,
+                        style: { ...S.row, padding: '2px 0', borderBottom: '1px solid var(--dsw-alias-border-l1)' },
+                      },
+                        h('span', { style: { ...S.mono, minWidth: 100 } }, hexId(item.id)),
+                        h('span', { style: { ...S.muted, minWidth: 80 } }, item.shallow === null ? '—' : formatBytes(item.shallow)),
+                        h('button', {
+                          type: 'button', className: 'hp-link',
+                          onClick: () => onObject(item.id),
+                        }, '查看')))),
+                    h('div', { style: { ...S.row, marginTop: 6 } },
+                      h(Btn, { onClick: () => setUnreachablePage((value) => Math.max(0, value - 1)), disabled: unreachablePage === 0 }, '上一页'),
+                      h('span', { style: S.muted }, `第 ${unreachablePage + 1} / ${unreachablePages} 页`),
+                      h(Btn, { onClick: () => setUnreachablePage((value) => value + 1), disabled: unreachablePage + 1 >= unreachablePages }, '下一页'))))
+                : null)
+          ))
     }
 
     /** Merge GC-root path groups into one indented prefix tree. */
@@ -2373,7 +2421,7 @@ window.__ModuleLoader__.load({
       })
       else if (tab === 'path') body = h(PathTab, { dumpId: activeDumpId, objectId: pathObjectId, onBack: () => setTab(returnTab) })
       else if (tab === 'classpaths') body = h(ClassPathsTab, {
-        dumpId: activeDumpId, classInfo, onBack: () => setTab('classes'),
+        dumpId: activeDumpId, classInfo, onBack: () => setTab('classes'), onObject: openObject,
         treeCommand, onTreeChange: handleClassPathTreeChange,
       })
       else if (tab === 'referrers') body = h(ReferrersTab, {

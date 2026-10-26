@@ -100,8 +100,7 @@ function withMore(result, page, size) {
 
 function compactClassPaths(result, page, size) {
   const groups = Array.isArray(result.groups) ? result.groups : []
-  const start = page * size
-  const slice = groups.slice(start, start + size).map((group) => {
+  const slice = groups.map((group) => {
     const steps = Array.isArray(group.steps) ? group.steps : []
     const chain = steps
       .map((step, index) => (index === 0 ? '<root>' : `${step.className}${step.via ? ` <- ${step.via}` : ''}`))
@@ -113,14 +112,20 @@ function compactClassPaths(result, page, size) {
       samples: group.samples ?? [],
     }
   })
+  const groupOffset = result.groupOffset ?? page * size
   return {
     className: result.className,
     groupCount: result.groupCount,
-    page,
-    size,
+    totalObjects: result.totalObjects,
+    scanned: result.scanned,
+    reachable: result.reachable,
+    unreachable: result.unreachable,
+    page: result.page ?? page,
+    size: result.size ?? size,
     returned: slice.length,
-    hasMore: start + slice.length < groups.length,
+    hasMore: result.hasMore ?? (groupOffset + slice.length < (result.groupCount ?? 0)),
     groups: slice,
+    unreachableSamples: (result.unreachableItems ?? []).slice(0, 5),
   }
 }
 
@@ -333,6 +338,8 @@ export function createHprofService(runtime, options = {}) {
           class_id: asId(params.class_id, 'class_id'),
           kind: params.kind === 'primitive' ? 'primitive' : 'class',
           weak: params.weak === true,
+          page,
+          size,
           include_holders: true,
         }, exec)
         return compactClassPaths(result, page, size)
