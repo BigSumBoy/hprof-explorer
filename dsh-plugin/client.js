@@ -388,8 +388,8 @@ window.__ModuleLoader__.load({
         border: '1px solid var(--dsw-alias-border-l1)', whiteSpace: 'pre-wrap',
         wordBreak: 'break-word', fontSize: 11, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
       },
-      chain: { margin: '4px 0 10px', paddingLeft: 10, borderLeft: '2px solid var(--dsw-alias-border-l2)' },
-      chainLine: { fontSize: 11, lineHeight: 1.7, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
+      chain: { margin: '6px 0 10px', padding: '6px 10px', borderLeft: '3px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, var(--dsw-alias-border-l2))', borderRadius: '0 5px 5px 0', background: 'color-mix(in srgb, var(--dsw-alias-brand-primary) 3%, transparent)' },
+      chainLine: { fontSize: 12, fontWeight: 500, lineHeight: 1.8, color: 'var(--dsw-alias-label-primary)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' },
     }
 
     function Btn({ children, onClick, primary, danger, ghost, disabled, title, style }) {
