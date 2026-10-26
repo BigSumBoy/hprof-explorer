@@ -453,6 +453,14 @@ async function exerciseRoutes(runtime) {
   assert.equal(otherPanel.commands.length, 0)
   const targetPanel = await get(handler, `/hprof-api/ui/commands?dump_id=${dumps.dumps[0].dump_id}&client_id=panel-a`)
   assert.ok(targetPanel.commands.some((item) => item.id === targeted.id))
+  await post(handler, '/hprof-api/ui/ack', {
+    dump_id: dumps.dumps[0].dump_id,
+    client_id: 'panel-a',
+    command_id: targeted.id,
+    status: 'applied',
+  })
+  const ackedPanel = await get(handler, `/hprof-api/ui/state?dump_id=${dumps.dumps[0].dump_id}&client_id=panel-a`)
+  assert.ok(ackedPanel.command_status.some((entry) => entry.command_id === targeted.id && entry.status === 'applied'))
   const panels = await get(handler, `/hprof-api/ui/state?dump_id=${dumps.dumps[0].dump_id}`)
   assert.ok(Array.isArray(panels.panels) && panels.panels.length >= 1)
 }

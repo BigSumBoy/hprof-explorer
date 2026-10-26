@@ -191,8 +191,15 @@ export function createHprofRuntime(config = {}) {
     const existing = [...dumps.values()].find((rec) => rec.realPath === real)
     if (existing !== undefined && existing.child.exitCode === null) {
       touch(existing)
-      if (existing.opened === undefined) throw new Error(`dump ${existing.id} is still opening; retry shortly`)
-      return existing.opened
+      if (existing.opened !== undefined) return existing.opened
+      // A second panel can ask for the same path while the first open is still
+      // parsing. Wait for that open instead of surfacing a transient race.
+      const deadline = Date.now() + Math.min(cfg.startTimeoutMs, 30_000)
+      while (existing.opened === undefined && existing.child?.exitCode === null && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      }
+      if (existing.opened !== undefined) return existing.opened
+      throw new Error(`dump ${existing.id} is still opening; retry shortly`)
     }
     if (existing !== undefined) stop(existing)
     evictIfNeeded()
@@ -561,6 +568,17 @@ export function createApiHandler(runtime, options = {}) {
         sendJson(res, 200, uiState.command(body.dump_id, body.action, body.params, body.client_id))
         return
       }
+      if (req.method === 'POST' && route === '/ui/ack') {
+        const body = await readJsonBody(req)
+        sendJson(res, 200, uiState.ack(
+          body.dump_id,
+          body.client_id,
+          body.command_id,
+          body.status,
+          body.error,
+        ))
+        return
+      }
       if (req.method === 'GET' && route === '/ui/commands') {
         sendJson(res, 200, uiState.drain(
           url.searchParams.get('dump_id') ?? undefined,
@@ -862,7 +880,7 @@ export function createToolDefinitions(runtime, options = {}) {
           throw new Error(`unknown UI action "${action}"; call action="manifest"`)
         }
 
-        const snapshot = await service.dispatch('ui.state', { dump_id: dumpId, client_id: clientId }, exec)
+        const snapshot = await service.dispatch('ui.state', { dump_id: dumpId }, exec)
         const panels = snapshot.panels ?? []
         if (clientId !== undefined && !panels.some((panel) => panel.client_id === clientId)) {
           const ids = panels.map((panel) => panel.client_id).filter(Boolean).join(', ')
@@ -877,13 +895,10 @@ export function createToolDefinitions(runtime, options = {}) {
             params: request.params,
           }, exec))
         }
-        return {
+        const response = {
           action,
           commands,
           queued: true,
-          warning: panels.length === 0
-            ? 'No HPROF panel is reporting; commands are queued. Open the HPROF workspace and select the dump.'
-            : undefined,
           panels: panels.map((panel) => ({
             client_id: panel.client_id,
             panel: panel.state?.panel ?? null,
@@ -891,6 +906,10 @@ export function createToolDefinitions(runtime, options = {}) {
           })),
           state: snapshot.state,
         }
+        if (panels.length === 0) {
+          response.warning = 'No HPROF panel is reporting; commands are queued. Open the HPROF workspace and select the dump.'
+        }
+        return response
       },
     }),
     definition({

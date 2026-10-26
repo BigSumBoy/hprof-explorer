@@ -143,7 +143,8 @@ UI 的分析区新增 **「发现」** tab：打开对象抽屉后切过去，ta
 
 `ui-state.mjs` 是 Host 和 Web 面板之间的轻量桥：
 
-- 每个面板生成一个 `client_id`，通过 `POST /hprof-api/ui/state` 上报 `dump_id/panel/tab/class/object/path/referrers/row/filters/page/sort/tree`；
+- 每个面板生成一个 `client_id`，通过 `POST /hprof-api/ui/state` 上报 `dump_id/panel/tab/class/object/path/referrers/row/filters/page/sort/tree/classPaths`；
+- 面板处理完命令后通过 `POST /hprof-api/ui/ack` 回报 `command_id/status`；`ui.state.command_status` 返回最近 10 条；
 - `panel` 是 `workspace` 或 `sidebar`，多面板时用于区分；
 - 过滤、分页、排序按 dump 文件路径写入 localStorage，切 tab 或刷新后恢复；
 - 面板每 1.2s 拉 `GET /hprof-api/ui/commands?dump_id=...&client_id=...` 并执行；
@@ -181,9 +182,9 @@ hprof_ui(action="showClassPaths", class_id=1877222656, class_name="android.view.
 hprof_ui(action="showUnreachable", class_id=1877222656)
 ```
 
-`showClassPaths` 会展开成 `selectClass → selectTab classpaths → setWeak?`，返回命令 id；它不复制 UI 逻辑。底层 `hprof_api(op="ui.command")` 和 PTC 的 `hprof.ui.command` 仍然保留，作为完整 escape hatch。`ui.state` 返回 `available_actions`，`ui.manifest` 返回每个 action 的参数、示例和展开步骤。
+`showClassPaths` 会展开成 `selectClass → selectTab classpaths → setWeak?`，返回命令 id；它不复制 UI 逻辑。面板执行后会通过 `/ui/ack` 回报，`ui.state.command_status` 可确认 applied；`ui.state.classPaths` 返回 `weak/page/groupCount/reachable/unreachable/showUnreachable`。底层 `hprof_api(op="ui.command")` 和 PTC 的 `hprof.ui.command` 仍然保留，作为完整 escape hatch。`ui.state` 返回 `available_actions`，`ui.manifest` 返回每个 action 的参数、示例和展开步骤。
 
-`row` 是当前表格选中的 `{table, id, className}`；`filters` 是当前 tab 的过滤条件；`page`/`sort` 是当前分页/排序；`tree.expanded`/`tree.collapsed` 是支配树/类路径树的展开与折叠状态。真正写入 `SessionEventMap` 还需要 Host 侧 session-event seam，当前先用 UI event ledger 代替。
+`row` 是当前表格选中的 `{table, id, className}`；`filters` 是当前 tab 的过滤条件；`page`/`sort` 是当前分页/排序；`classPaths` 是类路径页的 `weak/page/groupCount/reachable/unreachable/showUnreachable`；`tree.expanded`/`tree.collapsed` 是支配树/类路径树的展开与折叠状态。真正写入 `SessionEventMap` 还需要 Host 侧 session-event seam，当前先用 UI event ledger 代替。
 
 ### PTC（plan B，当前）
 
@@ -273,6 +274,14 @@ tab 内布局：
 |---|---|
 | GET | `/dumps`、`/summary`、`/classes`、`/instances`、`/object`、`/path`、`/classpaths`、`/retained`、`/domtree`、`/strings`、`/roots`、`/referrers`、`/diff` |
 | POST | `/open`、`/close`、`/report` |
+
+## 开发时重载
+
+- **Host 半**：`index.js`、`service.mjs`、`engine.mjs`、`findings.mjs`、`ui-state.mjs`、`ui-manifest.mjs` 在 DSH 进程启动时加载一次。修改后必须重启 Host；`patchReload: live` 只重载配置，不重新执行 Node 模块。
+- **Client 半**：`client.js` 可以在页面硬刷新后重新加载；如果启用了 client HMR/dev watcher，也可以不刷新。没有 watcher 时用 `Ctrl+Shift+R`。
+- **Parser / engine**：新的 dump 会启动新的 engine 子进程，因此 `src/hprof.mjs` / `engine.mjs` 的修改可能在新 dump 上生效；但 Host 的 service/tool 代码仍是旧的，不要依赖这一点。
+- **减少重启的边界**：把 Host 工具契约稳定在 `hprof_api` / `hprof_ui` / `/ui/*`，之后纯视觉、文案、布局的 UI 改动只动 `client.js`，刷新即可。只有新增 Host action、改 service 返回结构或改 routes 时才需要重启。
+- **不要在生产 profile 做 Host 热重载**；没有可靠的模块级 reload，强行做会留下旧模块、旧子进程和旧 tool schema。
 
 ## 配置
 

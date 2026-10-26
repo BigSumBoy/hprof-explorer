@@ -27,18 +27,24 @@ window.__ModuleLoader__.load({
      * states are the clickability signal, and regions get distinct tints.
      */
     const UI_CSS = `
-.hp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap; border-radius: 6px; border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); cursor: pointer; transition: background .12s ease, border-color .12s ease, color .12s ease; }
-.hp-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-base); border-color: var(--dsw-alias-border-l2); }
-.hp-btn:active:not(:disabled) { background: var(--dsw-alias-bg-layer-2); }
+.hp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, var(--dsw-alias-border-l2)); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); box-shadow: 0 1px 1px color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent); cursor: pointer; transition: background .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease; }
+.hp-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-2)); border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 55%, var(--dsw-alias-border-l2)); color: var(--dsw-alias-brand-primary); box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent); }
+.hp-btn:active:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, var(--dsw-alias-bg-layer-2)); box-shadow: none; }
+.hp-btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 40%, transparent); outline-offset: 1px; }
 .hp-btn:disabled { opacity: .45; cursor: default; }
-.hp-btn-primary { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); }
-.hp-btn-primary:hover:not(:disabled) { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); filter: brightness(1.06); }
+.hp-btn-primary { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); box-shadow: 0 1px 2px color-mix(in srgb, var(--dsw-alias-brand-primary) 25%, transparent); }
+.hp-btn-primary:hover:not(:disabled) { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); filter: brightness(1.06); }
 .hp-btn-primary:active:not(:disabled) { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); filter: brightness(.96); }
 .hp-btn-sm { padding: 1px 7px; font-size: 11px; }
-.hp-btn-ghost { background: transparent; border-color: transparent; color: var(--dsw-alias-label-secondary); }
-.hp-btn-ghost:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2); border-color: transparent; color: var(--dsw-alias-label-primary); }
-.hp-btn-danger { color: var(--dsw-alias-state-error-primary); }
-.hp-btn-danger:hover:not(:disabled) { border-color: var(--dsw-alias-state-error-primary); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent); }
+.hp-btn-ghost { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 5%, var(--dsw-alias-bg-layer-1)); border-color: var(--dsw-alias-border-l2); color: var(--dsw-alias-label-primary); box-shadow: none; }
+.hp-btn-ghost:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 9%, var(--dsw-alias-bg-layer-2)); border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 40%, var(--dsw-alias-border-l2)); color: var(--dsw-alias-brand-primary); }
+.hp-btn-danger { color: var(--dsw-alias-state-error-primary); border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 35%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 5%, var(--dsw-alias-bg-layer-1)); }
+.hp-btn-danger:hover:not(:disabled) { border-color: var(--dsw-alias-state-error-primary); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, var(--dsw-alias-bg-layer-2)); color: var(--dsw-alias-state-error-primary); }
+.hp-segmented { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 7px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-2); }
+.hp-segment { padding: 3px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: 11px; font-weight: 500; line-height: 1.4; white-space: nowrap; cursor: pointer; }
+.hp-segment:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, transparent); color: var(--dsw-alias-brand-primary); }
+.hp-segment-active { background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); }
+.hp-segment-active:hover { background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); }
 .hp-header { background: var(--dsw-alias-bg-layer-1); border-bottom: 1px solid var(--dsw-alias-border-l1); box-shadow: inset 0 2px 0 color-mix(in srgb, var(--dsw-alias-brand-primary) 55%, transparent); }
 .hp-tabs { background: var(--dsw-alias-bg-layer-1); border-bottom: 1px solid var(--dsw-alias-border-l1); }
 .hp-tab { flex: 0 0 auto; padding: 7px 12px; font-family: inherit; font-size: 13px; font-weight: 500; color: var(--dsw-alias-label-secondary); border: 0; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; background: transparent; cursor: pointer; white-space: nowrap; transition: background .12s ease, color .12s ease; }
@@ -48,8 +54,8 @@ window.__ModuleLoader__.load({
 .hp-row { transition: background .1s ease; }
 .hp-row-click { cursor: pointer; }
 .hp-row-click:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, transparent); }
-.hp-link { padding: 0; border: 0; background: transparent; color: var(--dsw-alias-brand-primary); font: inherit; text-align: left; cursor: pointer; }
-.hp-link:hover { text-decoration: underline; }
+.hp-link { padding: 0; border: 0; background: transparent; color: var(--dsw-alias-brand-primary); font: inherit; font-weight: 500; text-align: left; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; cursor: pointer; }
+.hp-link:hover { text-decoration-thickness: 2px; }
 .hp-link:disabled { opacity: .45; cursor: default; text-decoration: none; }
 .hp-link:focus-visible { outline: 2px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent); outline-offset: 1px; border-radius: 3px; }
 .hp-input, .hp-select, .hp-chat-input { font-family: inherit; }
@@ -73,6 +79,28 @@ window.__ModuleLoader__.load({
 .hp-table tbody tr.hp-row-selected td:first-child { box-shadow: inset 3px 0 0 var(--dsw-alias-brand-primary); }
 .hp-table tbody tr.hp-row-selected:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 15%, transparent); }
 .hp-row-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; white-space: nowrap; }
+.hp-action { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 22px; padding: 2px 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 32%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 6%, var(--dsw-alias-bg-layer-1)); color: var(--dsw-alias-brand-primary); font-family: inherit; font-size: 11px; font-weight: 500; line-height: 1.3; white-space: nowrap; cursor: pointer; transition: background .12s ease, border-color .12s ease, color .12s ease; }
+.hp-action:hover { background: var(--dsw-alias-brand-primary); border-color: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); }
+.hp-action:active { filter: brightness(.95); }
+.hp-action:focus-visible { outline: 2px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 35%, transparent); outline-offset: 1px; }
+.hp-action-quiet { border-color: var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); }
+.hp-action-quiet:hover { background: var(--dsw-alias-bg-layer-2); border-color: var(--dsw-alias-border-l2); color: var(--dsw-alias-label-primary); }
+.hp-tree { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.hp-tree-row { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 3px 8px 3px 5px; border-radius: 5px; border-left: 3px solid transparent; color: var(--dsw-alias-label-primary); font-size: 12px; font-weight: 500; line-height: 1.45; transition: background .1s ease, border-color .1s ease; }
+.hp-tree-row:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 6%, transparent); }
+.hp-tree-row-depth-0 { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 5%, var(--dsw-alias-bg-layer-1)); border-left-color: var(--dsw-alias-brand-primary); }
+.hp-tree-row-depth-1 { border-left-color: var(--dsw-alias-state-success-primary); }
+.hp-tree-row-depth-2 { border-left-color: var(--dsw-alias-state-warn-primary); }
+.hp-tree-row-depth-3 { border-left-color: var(--dsw-alias-label-secondary); }
+.hp-tree-indents { display: inline-flex; align-self: stretch; flex: 0 0 auto; }
+.hp-tree-indent { width: 14px; align-self: stretch; border-left: 1px solid var(--dsw-alias-border-l2); opacity: .75; }
+.hp-tree-caret { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 16px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--dsw-alias-label-secondary); font-family: inherit; font-size: 12px; font-weight: 500; line-height: 1; cursor: pointer; }
+.hp-tree-caret:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
+.hp-tree-caret:disabled { cursor: default; opacity: .55; }
+.hp-tree-dot { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 2px; background: var(--dsw-alias-brand-primary); }
+.hp-tree-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.hp-tree-via { flex: 0 0 auto; color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 400; }
+.hp-tree-count { flex: 0 0 auto; margin-left: auto; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-brand-primary) 8%, var(--dsw-alias-bg-layer-2)); color: var(--dsw-alias-label-secondary); font-size: 10px; font-weight: 500; white-space: nowrap; }
 .hp-filter { position: relative; display: flex; align-items: center; }
 .hp-filter-icon { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 11px; height: 11px; color: var(--dsw-alias-label-secondary); pointer-events: none; }
 .hp-filter-prefix { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); font-size: 10px; line-height: 1; color: var(--dsw-alias-label-secondary); pointer-events: none; }
@@ -414,7 +442,7 @@ window.__ModuleLoader__.load({
               typeof rowActions === 'function' ? rowActions(row) : null,
               h('button', {
                 type: 'button',
-                className: 'hp-btn hp-btn-sm',
+                className: 'hp-action hp-action-quiet',
                 title: '查看详情',
                 onClick: (event) => {
                   event.stopPropagation()
@@ -633,7 +661,7 @@ window.__ModuleLoader__.load({
           onRowSelect: (row) => onSelectRow?.('classes', row),
           selectedRowId,
           rowActions: (row) => h('button', {
-            type: 'button', className: 'hp-link',
+            type: 'button', className: 'hp-action',
             onClick: (event) => { event.stopPropagation(); onClassPaths(row) },
             onDoubleClick: (event) => event.stopPropagation(),
           }, 'GC 路径'),
@@ -853,7 +881,7 @@ window.__ModuleLoader__.load({
               }, `${index === 0 ? '' : '↳ '}${step.className}${step.id === 0 ? '' : ` @ ${hexId(step.id)}`}${step.via ? `  —(${step.via})→` : ''}`)))))
     }
 
-    function ClassPathsTab({ dumpId, classInfo, onBack, onObject, treeCommand, onTreeChange, weakRequest }) {
+    function ClassPathsTab({ dumpId, classInfo, onBack, onObject, treeCommand, onTreeChange, weakRequest, onStateChange }) {
       const PAGE_SIZE = 10
       const UNREACHABLE_SIZE = 50
       const [weak, setWeak] = useState(false)
@@ -870,6 +898,17 @@ window.__ModuleLoader__.load({
         ? `${API}/classpaths?dump_id=${encodeURIComponent(dumpId)}&class_id=${classInfo.id}&kind=${classInfo.kind ?? 'class'}&page=${page}&size=${PAGE_SIZE}${weak ? '&weak=1' : ''}`
         : null, { cache: true })
       const data = result.data
+      useEffect(() => {
+        onStateChange?.({
+          weak,
+          page,
+          groupCount: data?.groupCount ?? 0,
+          reachable: data?.reachable ?? 0,
+          unreachable: data?.unreachable ?? 0,
+          showUnreachable,
+          unreachablePage,
+        })
+      }, [onStateChange, weak, page, data?.groupCount, data?.reachable, data?.unreachable, showUnreachable, unreachablePage])
       const treeCommandRef = useRef(null)
       useEffect(() => {
         setPage(0)
@@ -921,8 +960,17 @@ window.__ModuleLoader__.load({
           h('label', { style: { ...S.muted, display: 'flex', gap: 4, alignItems: 'center' } },
             h('input', { type: 'checkbox', checked: weak, onChange: (event) => setWeak(event.target.checked) }),
             '包含弱引用'),
-          h(Btn, { onClick: () => setMode('tree') }, '树形'),
-          h(Btn, { onClick: () => setMode('text') }, '文本')),
+          h('div', { className: 'hp-segmented', role: 'group', 'aria-label': '类路径视图' },
+            h('button', {
+              type: 'button', className: `hp-segment${mode === 'tree' ? ' hp-segment-active' : ''}`,
+              'aria-pressed': mode === 'tree',
+              onClick: () => setMode('tree'),
+            }, '树形'),
+            h('button', {
+              type: 'button', className: `hp-segment${mode === 'text' ? ' hp-segment-active' : ''}`,
+              'aria-pressed': mode === 'text',
+              onClick: () => setMode('text'),
+            }, '文本'))),
         data === null
           ? h('div', { style: S.muted }, '加载中…')
           : h('div', null,
@@ -930,15 +978,32 @@ window.__ModuleLoader__.load({
               `${data.totalObjects} 个对象 · 可达 ${data.reachable} · 不可达 ${data.unreachable} · ${data.groupCount} 组`
               + (data.sampled ? ' · 已采样' : '')),
             mode === 'tree'
-              ? h('div', null, treeRows.map((row) => h('div', {
-                key: row.key,
-                style: { ...S.chainLine, paddingLeft: row.depth * 14, display: 'flex', gap: 4, alignItems: 'center' },
-              },
-                h('button', {
-                  type: 'button', className: 'hp-link', disabled: !row.hasChildren,
-                  onClick: () => toggleNode(row.key),
-                }, row.hasChildren ? (collapsed.has(row.key) ? '▸' : '▾') : '·'),
-                h('span', null, `${row.className}${row.via ? `  —(${row.via})→` : ''}  ·  ${row.count} 个对象`))))
+              ? h('div', { className: 'hp-tree' }, treeRows.map((row) => {
+                const tone = row.depth === 0
+                  ? 'var(--dsw-alias-brand-primary)'
+                  : row.depth === 1
+                    ? 'var(--dsw-alias-state-success-primary)'
+                    : row.depth === 2
+                      ? 'var(--dsw-alias-state-warn-primary)'
+                      : 'var(--dsw-alias-label-secondary)'
+                return h('div', {
+                  key: row.key,
+                  className: `hp-tree-row hp-tree-row-depth-${Math.min(row.depth, 3)}`,
+                },
+                  row.depth > 0
+                    ? h('span', { className: 'hp-tree-indents', 'aria-hidden': true },
+                      Array.from({ length: row.depth }, (_, index) => h('span', { key: index, className: 'hp-tree-indent' })))
+                    : null,
+                  h('button', {
+                    type: 'button', className: 'hp-tree-caret', disabled: !row.hasChildren,
+                    'aria-label': row.hasChildren ? (collapsed.has(row.key) ? '展开节点' : '折叠节点') : undefined,
+                    onClick: () => toggleNode(row.key),
+                  }, row.hasChildren ? (collapsed.has(row.key) ? '▸' : '▾') : '·'),
+                  h('span', { className: 'hp-tree-dot', style: { background: tone }, 'aria-hidden': true }),
+                  h('span', { className: 'hp-tree-name' }, row.className),
+                  row.via ? h('span', { className: 'hp-tree-via' }, `— ${row.via} →`) : null,
+                  h('span', { className: 'hp-tree-count' }, `${row.count} 个对象`))
+              }))
               : (data.groups ?? []).map((group, index) => h('div', { key: index, style: { marginBottom: 10 } },
                 h('div', { style: S.muted }, `${group.count} 个对象 · shallow ${formatBytes(group.shallow)}`),
                 h('div', { style: S.chain }, (group.steps ?? []).map((step, stepIndex) => h('div', {
@@ -970,7 +1035,7 @@ window.__ModuleLoader__.load({
                         h('span', { style: { ...S.mono, minWidth: 100 } }, hexId(item.id)),
                         h('span', { style: { ...S.muted, minWidth: 80 } }, item.shallow === null ? '—' : formatBytes(item.shallow)),
                         h('button', {
-                          type: 'button', className: 'hp-link',
+                          type: 'button', className: 'hp-action hp-action-quiet',
                           onClick: () => onObject(item.id),
                         }, '查看')))),
                     h('div', { style: { ...S.row, marginTop: 6 } },
@@ -1871,6 +1936,11 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = useState(false)
       const [error, setError] = useState('')
       const [notice, setNotice] = useState('')
+      useEffect(() => {
+        if (notice === '') return
+        const timer = setTimeout(() => setNotice(''), 6_000)
+        return () => clearTimeout(timer)
+      }, [notice])
       const [tab, setTab] = useState('overview')
       const [classInfo, setClassInfo] = useState(null)
       const [returnTab, setReturnTab] = useState('classes')
@@ -1905,6 +1975,7 @@ window.__ModuleLoader__.load({
       const [classPathCollapsed, setClassPathCollapsed] = useState([])
       const [treeCommand, setTreeCommand] = useState(null)
       const [weakRequest, setWeakRequest] = useState(null)
+      const [classPathState, setClassPathState] = useState(null)
       const [chatDraftCommand, setChatDraftCommand] = useState(null)
       const [mountNonce, setMountNonce] = useState(0)
       const viewStorageRef = useRef(null)
@@ -1933,6 +2004,9 @@ window.__ModuleLoader__.load({
       }, [])
       const handleClassPathTreeChange = useCallback((collapsed) => {
         setClassPathCollapsed(collapsed)
+      }, [])
+      const handleClassPathState = useCallback((state) => {
+        setClassPathState(state)
       }, [])
 
       useEffect(() => {
@@ -2023,8 +2097,13 @@ window.__ModuleLoader__.load({
         setViewState(null)
         setTreeExpanded([])
         setClassPathCollapsed([])
+        setClassPathState(null)
         setTreeCommand(null)
       }, [activeDumpId])
+
+      useEffect(() => {
+        if (tab !== 'classpaths') setClassPathState(null)
+      }, [tab])
 
       useEffect(() => {
         if (activeDumpId === null) return
@@ -2051,12 +2130,13 @@ window.__ModuleLoader__.load({
                   expanded: treeExpanded,
                   collapsed: classPathCollapsed,
                 },
+                classPaths: classPathState,
               },
             },
           }).catch(() => {})
         }, 80)
         return () => clearTimeout(timer)
-      }, [activeDumpId, tab, classInfo, drawerObjectId, pathObjectId, referrersObjectId, rowSelection, tableFilters, viewState, treeExpanded, classPathCollapsed, clientId])
+      }, [activeDumpId, tab, classInfo, drawerObjectId, pathObjectId, referrersObjectId, rowSelection, tableFilters, viewState, treeExpanded, classPathCollapsed, classPathState, clientId])
 
       useEffect(() => {
         if (activeDumpId === null) return
@@ -2065,7 +2145,9 @@ window.__ModuleLoader__.load({
         async function poll() {
           try {
             const data = await api(`/ui/commands?dump_id=${encodeURIComponent(activeDumpId)}&client_id=${encodeURIComponent(clientId)}`)
+            const appliedIds = []
             for (const command of data?.commands ?? []) {
+              appliedIds.push(command.id)
               if (!alive) return
               const params = command.params ?? {}
               if (command.action === 'selectTab' && typeof params.tab === 'string' && UI_TABS.has(params.tab)) {
@@ -2075,6 +2157,7 @@ window.__ModuleLoader__.load({
                 setViewState(null)
                 setTreeExpanded([])
                 setClassPathCollapsed([])
+                setClassPathState(null)
                 setTreeCommand(null)
               } else if (command.action === 'selectRow'
                 && typeof params.table === 'string' && ROW_TABS.has(params.table)
@@ -2161,6 +2244,17 @@ window.__ModuleLoader__.load({
               } else if (command.action === 'notice') {
                 setNotice(String(params.text ?? ''))
               }
+            }
+            for (const commandId of appliedIds) {
+              void api('/ui/ack', {
+                method: 'POST',
+                body: {
+                  dump_id: activeDumpId,
+                  client_id: clientId,
+                  command_id: commandId,
+                  status: 'applied',
+                },
+              }).catch(() => {})
             }
           } catch {
             // The panel can be open while the Host reconnects; retry on the next tick.
@@ -2431,6 +2525,7 @@ window.__ModuleLoader__.load({
       else if (tab === 'classpaths') body = h(ClassPathsTab, {
         dumpId: activeDumpId, classInfo, onBack: () => setTab('classes'), onObject: openObject,
         treeCommand, onTreeChange: handleClassPathTreeChange, weakRequest,
+        onStateChange: handleClassPathState,
       })
       else if (tab === 'referrers') body = h(ReferrersTab, {
         key: tabMountKey,
@@ -2490,6 +2585,7 @@ window.__ModuleLoader__.load({
             setViewState(null)
             setTreeExpanded([])
             setClassPathCollapsed([])
+            setClassPathState(null)
             setTreeCommand(null)
             if (key === 'findings') return
             setClassInfo(null)
@@ -2504,8 +2600,18 @@ window.__ModuleLoader__.load({
             pageTitle === null
               ? null
               : h('div', { className: 'hp-page-header' }, h('h2', { className: 'hp-page-title' }, pageTitle)),
-            error === '' ? null : h('div', { style: S.error }, error),
-            notice === '' ? null : h('div', { style: S.notice }, notice),
+            error === '' ? null : h('div', { style: { ...S.error, display: 'flex', gap: 8, alignItems: 'flex-start' } },
+              h('span', { style: { flex: 1 } }, error),
+              h('button', {
+                type: 'button', className: 'hp-link', title: '关闭提示',
+                onClick: () => setError(''),
+              }, '关闭')),
+            notice === '' ? null : h('div', { style: { ...S.notice, display: 'flex', gap: 8, alignItems: 'flex-start' } },
+              h('span', { style: { flex: 1 } }, notice),
+              h('button', {
+                type: 'button', className: 'hp-link', title: '关闭提示',
+                onClick: () => setNotice(''),
+              }, '关闭')),
             dumpsLoaded && dumps.length === 0 && lastDump !== null
               ? h('div', {
                 style: { ...S.notice, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },

@@ -97,7 +97,7 @@ Filter, page, and sort state are also written to browser localStorage keyed by d
 
 ## UI bridge
 
-The panel polls `/hprof-api/ui/commands` every 1.2 seconds and reports state through `POST /hprof-api/ui/state`. Commands are domain actions:
+The panel polls `/hprof-api/ui/commands` every 1.2 seconds and reports state through `POST /hprof-api/ui/state`. After applying delivered commands it posts `/hprof-api/ui/ack`; `ui.state.command_status` exposes the latest acks. Commands are domain actions:
 
 ```text
 selectTab
@@ -118,7 +118,7 @@ draftMessage
 notice
 ```
 
-`draftMessage` fills the bottom Chat composer without sending. The main workspace's embedded Conversation has its own composer and is not filled by this command.
+`draftMessage` fills the bottom Chat composer without sending. The main workspace's embedded Conversation has its own composer and is not filled by this command. The class-path tab reports its `weak`, `page`, `groupCount`, `reachable`, `unreachable`, and unreachable-list visibility as `classPaths` in `ui.state`.
 
 `hprof_ui` is the model-first projection over these commands. It uses flat parameters and a closed action enum; high-level actions such as `showClassPaths` and `showUnreachable` expand into the low-level commands above. The low-level `hprof_api` `ui.command` and PTC `hprof.ui.command` remain the complete escape hatch. `ui.manifest` returns the action catalog, and `ui.state` includes `available_actions` and panel ids.
 
@@ -181,7 +181,7 @@ Live browser verification has covered:
 - class-path tree collapse;
 - class-path counts and unreachable list on a 164 MB dump: 5339 total, 1865 weak-reachable, 3474 unreachable, 1437 groups; group page 1436 returned the final group;
 - `hprof_ui` manifest and high-level `showClassPaths` expansion, including `setWeak`, applied by the live sidebar panel;
-- `ui.state` exposing `available_actions`;
+- `ui.state` exposing `available_actions`, `classPaths`, and command acks;
 - cross-panel command targeting;
 - Chat draft filling without sending;
 - report containing five findings.

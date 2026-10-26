@@ -42,6 +42,7 @@ export function createUiState() {
   const states = new Map()
   const queues = new Map()
   const events = new Map()
+  const acks = new Map()
   let sequence = 0
 
   function record(dumpId, event) {
@@ -67,8 +68,19 @@ export function createUiState() {
     const key = dumpKey(dumpId)
     if (clientId !== undefined && clientId !== null) {
       const recordValue = states.get(panelKey(dumpId, clientId))
-      if (recordValue === undefined) return { dump_id: dumpId ?? null, state: null, updatedAt: null, client_id: clientId }
-      return { dump_id: dumpId ?? null, ...recordValue }
+      const statuses = (acks.get(key) ?? []).filter((entry) => entry.client_id === clientId).slice(-10).reverse()
+      const panels = recordValue === undefined ? [] : [{ ...recordValue, client_id: clientId }]
+      if (recordValue === undefined) {
+        return {
+          dump_id: dumpId ?? null,
+          state: null,
+          updatedAt: null,
+          client_id: clientId,
+          panels,
+          command_status: statuses,
+        }
+      }
+      return { dump_id: dumpId ?? null, ...recordValue, panels, command_status: statuses }
     }
     const panels = []
     for (const [key2, recordValue] of states) {
@@ -77,12 +89,17 @@ export function createUiState() {
     }
     panels.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
     const latest = panels[0]
+    const statuses = (acks.get(key) ?? [])
+      .filter((entry) => clientId === undefined || clientId === null || entry.client_id === clientId)
+      .slice(-10)
+      .reverse()
     return {
       dump_id: dumpId ?? null,
       state: latest?.state ?? null,
       updatedAt: latest?.updatedAt ?? null,
       client_id: latest?.client_id ?? null,
       panels,
+      command_status: statuses,
     }
   }
 
@@ -106,6 +123,23 @@ export function createUiState() {
     queue.push(entry)
     queues.set(key, queue)
     record(dumpId, { type: 'command', command: entry })
+    return entry
+  }
+
+  function ack(dumpId, clientId, commandId, status, error) {
+    const key = dumpKey(dumpId)
+    const entry = {
+      command_id: String(commandId ?? ''),
+      client_id: clientId ?? null,
+      status: String(status ?? 'applied'),
+      at: new Date().toISOString(),
+    }
+    if (error !== undefined && error !== null) entry.error = String(error)
+    const list = acks.get(key) ?? []
+    list.push(entry)
+    if (list.length > 100) list.splice(0, list.length - 100)
+    acks.set(key, list)
+    record(dumpId, { type: 'ack', ...entry })
     return entry
   }
 
@@ -139,6 +173,7 @@ export function createUiState() {
       if (key2.startsWith(`${key}\u0000`)) states.delete(key2)
     }
     queues.delete(key)
+    acks.delete(key)
   }
 
   function eventLog(dumpId, limit = 50) {
@@ -146,5 +181,5 @@ export function createUiState() {
     return { dump_id: dumpId ?? null, events: list.slice(-Math.min(200, Math.max(1, limit))) }
   }
 
-  return { setState, getState, command, drain, clear, eventLog, actions: [...ACTIONS] }
+  return { setState, getState, command, drain, ack, clear, eventLog, actions: [...ACTIONS] }
 }

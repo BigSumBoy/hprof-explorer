@@ -11,7 +11,7 @@ export const UI_MANIFEST = {
   state_fields: [
     'dump_id', 'panel', 'client_id', 'tab', 'class_id', 'class_name',
     'object_id', 'path_object_id', 'referrers_object_id', 'row', 'filters',
-    'page', 'sort', 'tree',
+    'page', 'sort', 'tree', 'classPaths',
   ],
   actions: [
     {
