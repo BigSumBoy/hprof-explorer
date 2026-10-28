@@ -1317,10 +1317,15 @@ export class HprofIndex {
       }
       chain.push(0);
       chain.reverse();
-      const steps = chain.map((node, index) => ({
-        className: node === 0 ? '<root>' : this.objectClassName(this.nodeId[node]),
-        via: index === 0 ? null : this.edgeLabel(chain[index - 1], this.nodeId[node]),
-      }));
+      const steps = chain.map((node, index) => {
+        const rawVia = index === 0 ? null : this.edgeLabel(chain[index - 1], this.nodeId[node])
+        return {
+          className: node === 0 ? '<root>' : this.objectClassName(this.nodeId[node]),
+          // MAT-style aggregation: array slots are container positions, not
+          // separate lifetime paths. Merge [12], [214], ... into one path.
+          via: rawVia === null ? null : rawVia.replace(/^\[\d+\]$/, '[]'),
+        }
+      })
       const signature = steps.map((s) => `${s.className}\u0001${s.via ?? ''}`).join('\u0002');
       let group = groups.get(signature);
       if (!group) {

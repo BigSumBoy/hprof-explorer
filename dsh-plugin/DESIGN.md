@@ -120,6 +120,8 @@ notice
 
 `draftMessage` fills the bottom Chat composer without sending. The main workspace's embedded Conversation has its own composer and is not filled by this command. The class-path tab reports its `weak`, `page`, `groupCount`, `reachable`, `unreachable`, and unreachable-list visibility as `classPaths` in `ui.state`.
 
+Class-path grouping normalizes array-slot vias (`[12]`, `[214]`, ...) to `[]` before building the signature. This is the MAT-style view: `mCleanupSurfaces -> Object[] -> SurfaceControl` becomes one group with the container's total count, rather than one group per array index.
+
 `hprof_ui` is the model-first projection over these commands. It uses flat parameters and a closed action enum; high-level actions such as `showClassPaths` and `showUnreachable` expand into the low-level commands above. The low-level `hprof_api` `ui.command` and PTC `hprof.ui.command` remain the complete escape hatch. `ui.manifest` returns the action catalog, and `ui.state` includes `available_actions` and panel ids.
 
 A bounded in-memory event ledger records state reports, command enqueue, and delivery. It is diagnostic, not a session log.

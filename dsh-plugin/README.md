@@ -93,7 +93,7 @@ pnpm dsh plugin --profile web add link:D:/src/hprof-explorer/dsh-plugin
 | `hprof_instances(class_id, kind?, ...)` | 某类对象分页；数组类型用 `kind: 'primitive'` |
 | `hprof_object(id)` | 对象/类详情：字段、数组、String、retained、支配者 |
 | `hprof_path(id, weak?)` | 最短 GC Root 路径 |
-| `hprof_class_paths(class_id, kind?, weak?, page?, size?)` | 类级 GC Root 路径分组；分页返回全部链，带 holder id |
+| `hprof_class_paths(class_id, kind?, weak?, page?, size?)` | 类级 GC Root 路径分组；数组下标归一化为 `[]`，按实例数降序，分页返回并带 holder id |
 | `hprof_class_stats(class_id, kind?)` | 聚合实例数、可达/不可达、native 句柄、创建点、root/holder 分类 |
 | `hprof_retained(class_filter?, min_retained?, ...)` | Retained Size 排行 |
 | `hprof_strings(query?, min_length?, readable?, ...)` | 字符串搜索，可包含二进制内容 |

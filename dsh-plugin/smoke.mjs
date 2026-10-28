@@ -68,15 +68,16 @@ try {
   assert.ok(classPaths.totalObjects <= target.count)
   console.log(`class_paths: ${classPaths.groupCount ?? classPaths.groups.length} groups`)
 
+  const lastPathPage = Math.max(0, Math.ceil((classPaths.groupCount ?? 0) / 10) - 1)
   const deepPage = await call('hprof_class_paths', {
     dump_id: opened.dump_id,
     class_id: target.id,
     kind: target.kind,
-    page: 50,
+    page: lastPathPage,
     size: 10,
   })
-  assert.ok(deepPage.groups.length > 0, 'class path pagination must go beyond the old 100-group cap')
-  assert.equal(deepPage.page, 50)
+  assert.ok(deepPage.groups.length > 0, 'class path pagination must reach the final group page')
+  assert.equal(deepPage.page, lastPathPage)
   assert.equal(deepPage.hasMore, deepPage.page * deepPage.size + deepPage.groups.length < deepPage.groupCount)
   console.log(`class_paths deep page: ${deepPage.groups.length} groups at page ${deepPage.page}`)
 
