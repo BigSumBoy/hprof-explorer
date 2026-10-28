@@ -1800,6 +1800,18 @@ window.__ModuleLoader__.load({
                       suspect.topPath.chain.split(' | ').map((step, stepIndex) => h('div', {
                         key: stepIndex, style: S.chainLine,
                       }, step)))),
+                suspect.topPaths?.length > 1
+                  ? h('div', { style: { marginTop: 6 } },
+                    h('div', { style: S.hint }, '其他容器路径'),
+                    suspect.topPaths.slice(1, 3).map((path, pathIndex) => h('div', {
+                      key: pathIndex, style: { marginTop: 4 },
+                    },
+                      h('div', { className: 'hp-suspect-reason' }, `${path.count} 个`),
+                      h('div', { style: S.chain },
+                        path.chain.split(' | ').map((step, stepIndex) => h('div', {
+                          key: stepIndex, style: S.chainLine,
+                        }, step))))))
+                  : null,
                 h('div', { style: { ...S.row, marginTop: 6 } },
                   h(Btn, { onClick: () => onClass({ id: suspect.classId, name: suspect.className, kind: 'class' }) }, '查看类'),
                   h(Btn, {

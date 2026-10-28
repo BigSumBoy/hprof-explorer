@@ -125,6 +125,7 @@ try {
   assert.equal(leaks.suspects[0].classId, surface.id)
   const autoLeaks = await call('hprof_leaks', { dump_id: opened.dump_id, limit: 3 })
   assert.ok(Array.isArray(autoLeaks.suspects) && autoLeaks.suspects.length > 0)
+  assert.ok(Array.isArray(autoLeaks.suspects[0].topPaths) && autoLeaks.suspects[0].topPaths.length > 0)
 
   const retainedForSet = await call('hprof_retained', {
     dump_id: opened.dump_id,

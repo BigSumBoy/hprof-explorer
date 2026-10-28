@@ -304,6 +304,13 @@ const methods = {
         steps: paths.groups[0].steps,
         samples: paths.groups[0].samples,
       },
+      ...(params.top_paths === true ? {
+        topPaths: paths.groups.slice(0, 4).map((group) => ({
+          count: group.count,
+          steps: group.steps,
+          samples: group.samples,
+        })),
+      } : {}),
     }
   },
 
@@ -341,19 +348,28 @@ const methods = {
       .sort((a, b) => (nativeIds.has(b.id) ? 1 : 0) - (nativeIds.has(a.id) ? 1 : 0) || b.count - a.count)
       .slice(0, params.class_id !== undefined ? 1 : Math.min(12, Math.max(6, limit * 2)))
     const suspects = []
+    const summarizePath = (path) => {
+      const first = path?.steps?.[1]
+      const last = path?.steps?.[path.steps.length - 2]
+      const chain = path === null || path === undefined ? null : path.steps
+        .map((step, index) => (index === 0 ? '<root>' : `${step.className} <- ${step.via ?? '?'}`))
+        .join(' | ')
+      return path === null || path === undefined ? null : {
+        count: path.count,
+        root: first?.className ?? null,
+        holder: last?.className ?? null,
+        chain,
+        samples: path.samples?.slice(0, 3) ?? [],
+      }
+    }
     for (const candidate of candidates) {
       let stats
       try {
-        stats = methods.classStats({ class_id: candidate.id, kind: 'class' })
+        stats = methods.classStats({ class_id: candidate.id, kind: 'class', top_paths: true })
       } catch {
         continue
       }
       const top = stats.topPath
-      const first = top?.steps?.[1]
-      const last = top?.steps?.[top.steps.length - 2]
-      const chain = top === null || top === undefined ? null : top.steps
-        .map((step, index) => (index === 0 ? '<root>' : `${step.className} <- ${step.via ?? '?'}`))
-        .join(' | ')
       const reasons = []
       if (top !== null && top !== undefined && top.count >= 10) reasons.push(`top path holds ${top.count} objects`)
       if (stats.native?.retained > 0) reasons.push(`${stats.native.retained} native handles retained`)
@@ -370,13 +386,8 @@ const methods = {
         native: stats.native,
         hidden: stats.hidden,
         callsites: stats.callsites.slice(0, 5),
-        topPath: top === null || top === undefined ? null : {
-          count: top.count,
-          root: first?.className ?? null,
-          holder: last?.className ?? null,
-          chain,
-          samples: top.samples?.slice(0, 3) ?? [],
-        },
+        topPath: summarizePath(top),
+        topPaths: (stats.topPaths ?? []).map(summarizePath),
         reasons,
       })
     }

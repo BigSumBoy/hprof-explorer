@@ -101,7 +101,7 @@ pnpm dsh plugin --profile web add link:D:/src/hprof-explorer/dsh-plugin
 | `hprof_strings(query?, min_length?, readable?, ...)` | 字符串搜索，可包含二进制内容 |
 | `hprof_roots(type?, query?, ...)` | GC Roots 列表与类型过滤 |
 | `hprof_referrers(id, page?, size?, type?, field?)` | 谁引用这个对象；支持分页和 strong/weak/soft/phantom/final 过滤 |
-| `hprof_leaks(class_id?, limit?)` | 自动泄漏嫌疑：最大聚合容器、native retained、hidden、released wrapper |
+| `hprof_leaks(class_id?, limit?)` | 自动泄漏嫌疑：最大聚合容器、其他容器路径、native retained、hidden、released wrapper |
 | `hprof_diff(base, other)` | 两份 dump 的类级差分（增长/缩减/新增/消失） |
 | `hprof_report(dump_id?, out_path?)` | 生成 Markdown 报告并写入文件 |
 | `hprof_close(dump_id?)` | 结束引擎进程，释放内存 |
