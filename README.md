@@ -4,7 +4,7 @@
 
 维护与实现细节见 [docs/DESIGN.md](docs/DESIGN.md)。
 
-![overview](screenshot.png)
+
 
 ## 运行
 
@@ -58,14 +58,7 @@ node src/stats.mjs data/dump.hprof
 - **字符串**：默认过滤掉二进制/ICU 之类的不可读内容，可按内容搜索（例如“设置”“通知”），也可关闭过滤查看全部。
 - **GC Roots**：根类型统计与根对象列表。
 
-### Retained Size 与引用链
-
-![retained](screenshot-retained.png)
-
 ### 支配树树形浏览
-
-![tree](screenshot-tree.png)
-
 - 根节点是 GC Roots / Classes；每一层默认展示 Retained Size 前 100 个节点，可“显示更多”。
 - 有子节点的行左侧有 ▸/▾ 展开按钮；点击行本身（或行尾 ›）打开对象详情。
 - 详情里的“查看支配子树”会以当前对象为根重新加载树，工具栏的“回到支配树根”返回全局视图。
@@ -77,11 +70,7 @@ node src/stats.mjs data/dump.hprof
 
 对 129 MB、1.86M 节点、4.9M 边的 SystemUI dump：解析约 1.3 s，支配树约 3.7 s，内存约 0.9 GB。
 
-![path](screenshot-path.png)
-
 ### 类级 GC Root 路径
-
-![classpaths](screenshot-classpaths.png)
 
 - 在对象浏览页（选中某个类后）点 **GC Root 路径**，或在类详情里点 **分析该类所有对象的 GC Root 路径**。
 - 服务端先用 BFS 从 super-root 建立最短路径树，再为每个对象回溯到根；相同“类名 + 字段”链会合并成一组。
