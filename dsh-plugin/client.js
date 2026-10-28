@@ -117,6 +117,8 @@ window.__ModuleLoader__.load({
 .hp-suspect-rank { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); font-size: 11px; font-weight: 500; }
 .hp-suspect-score { color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 500; }
 .hp-suspect-reason { display: inline-flex; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, var(--dsw-alias-bg-layer-2)); color: var(--dsw-alias-state-warn-primary); font-size: 10px; font-weight: 500; }
+.hp-sync-status { padding: 1px 6px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: 9px; font-weight: 500; white-space: nowrap; }
+.hp-sync-status-error { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, var(--dsw-alias-bg-layer-2)); color: var(--dsw-alias-state-error-primary); }
 .hp-filter { position: relative; display: flex; align-items: center; }
 .hp-filter-icon { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 11px; height: 11px; color: var(--dsw-alias-label-secondary); pointer-events: none; }
 .hp-filter-prefix { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); font-size: 10px; line-height: 1; color: var(--dsw-alias-label-secondary); pointer-events: none; }
@@ -2230,6 +2232,7 @@ window.__ModuleLoader__.load({
       const [classPathState, setClassPathState] = useState(null)
       const [retainedSet, setRetainedSet] = useState(null)
       const [retainedSetLoading, setRetainedSetLoading] = useState(false)
+      const [syncStatus, setSyncStatus] = useState({ state: 'idle', poll: 'idle', error: '' })
       const [chatDraftCommand, setChatDraftCommand] = useState(null)
       const [mountNonce, setMountNonce] = useState(0)
       const viewStorageRef = useRef(null)
@@ -2408,7 +2411,11 @@ window.__ModuleLoader__.load({
                 classPaths: classPathState,
               },
             },
-          }).catch(() => {})
+          }).then(() => {
+            setSyncStatus((current) => ({ ...current, state: 'ok', error: '' }))
+          }).catch((cause) => {
+            setSyncStatus((current) => ({ ...current, state: 'error', error: String(cause?.message ?? cause) }))
+          })
         }, 80)
         return () => clearTimeout(timer)
       }, [activeDumpId, tab, classInfo, drawerObjectId, pathObjectId, referrersObjectId, rowSelection, tableFilters, viewState, treeExpanded, classPathCollapsed, classPathState, clientId])
@@ -2420,6 +2427,7 @@ window.__ModuleLoader__.load({
         async function poll() {
           try {
             const data = await api(`/ui/commands?dump_id=${encodeURIComponent(activeDumpId)}&client_id=${encodeURIComponent(clientId)}`)
+            setSyncStatus((current) => ({ ...current, poll: 'ok', error: '' }))
             const appliedIds = []
             for (const command of data?.commands ?? []) {
               appliedIds.push(command.id)
@@ -2531,8 +2539,8 @@ window.__ModuleLoader__.load({
                 },
               }).catch(() => {})
             }
-          } catch {
-            // The panel can be open while the Host reconnects; retry on the next tick.
+          } catch (cause) {
+            setSyncStatus((current) => ({ ...current, poll: 'error', error: String(cause?.message ?? cause) }))
           }
           if (alive) timer = setTimeout(poll, 1_200)
         }
@@ -2821,6 +2829,10 @@ window.__ModuleLoader__.load({
             h('span', { className: 'hp-analysis-dot', 'aria-hidden': true }),
             '分析'),
           h('span', { style: S.hint }, hideChat ? 'workspace' : 'sidebar'),
+          h('span', {
+            className: `hp-sync-status${syncStatus.error === '' ? '' : ' hp-sync-status-error'}`,
+            title: syncStatus.error === '' ? 'state/command 同步状态' : syncStatus.error,
+          }, `state:${syncStatus.state} poll:${syncStatus.poll}`),
           h('select', {
             className: 'hp-select',
             style: S.select, value: activeDumpId ?? '',
