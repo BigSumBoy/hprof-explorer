@@ -107,6 +107,11 @@ window.__ModuleLoader__.load({
 .hp-tree-name-button:hover { color: var(--dsw-alias-brand-primary); text-decoration: underline; text-underline-offset: 2px; }
 .hp-tree-id { flex: 0 0 auto; color: var(--dsw-alias-label-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 500; }
 .hp-tree-metric { flex: 0 0 auto; padding: 1px 7px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: 10px; font-weight: 500; white-space: nowrap; }
+.hp-tree-row-highlight { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 15%, var(--dsw-alias-bg-layer-1)); border-left-color: var(--dsw-alias-brand-primary); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-brand-primary) 22%, transparent); }
+.hp-tree-row-highlight:hover { background: color-mix(in srgb, var(--dsw-alias-brand-primary) 20%, var(--dsw-alias-bg-layer-1)); }
+.hp-tree-row-highlight .hp-tree-count { background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); }
+.hp-highlight-legend { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-1)); color: var(--dsw-alias-brand-primary); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.hp-highlight-swatch { width: 7px; height: 7px; border-radius: 2px; background: var(--dsw-alias-brand-primary); }
 .hp-filter { position: relative; display: flex; align-items: center; }
 .hp-filter-icon { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 11px; height: 11px; color: var(--dsw-alias-label-secondary); pointer-events: none; }
 .hp-filter-prefix { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); font-size: 10px; line-height: 1; color: var(--dsw-alias-label-secondary); pointer-events: none; }
@@ -893,6 +898,8 @@ window.__ModuleLoader__.load({
       const UNREACHABLE_SIZE = 50
       const [weak, setWeak] = useState(false)
       const [mode, setMode] = useState('tree')
+      const [highlightKey, setHighlightKey] = useState(null)
+      const [highlightCount, setHighlightCount] = useState(0)
       const [collapsed, setCollapsed] = useState(() => new Set())
       const [page, setPage] = useState(0)
       const [showUnreachable, setShowUnreachable] = useState(true)
@@ -906,6 +913,43 @@ window.__ModuleLoader__.load({
         : null, { cache: true })
       const data = result.data
       useEffect(() => {
+        if (mode !== 'tree' || data === null) {
+          setHighlightKey(null)
+          setHighlightCount(0)
+          return
+        }
+        const groups = data.groups ?? []
+        if (groups.length === 0) {
+          setHighlightKey(null)
+          setHighlightCount(0)
+          return
+        }
+        let best = groups[0]
+        for (const group of groups) {
+          if ((group.count ?? 0) > (best.count ?? 0)) best = group
+        }
+        const steps = best.steps ?? []
+        if (steps.length === 0) {
+          setHighlightKey(null)
+          setHighlightCount(0)
+          return
+        }
+        const prefixes = []
+        let prefix = ''
+        for (const step of steps) {
+          const part = `${step.className}\u0000${step.via ?? ''}`
+          prefix = prefix === '' ? part : `${prefix}\u0000${part}`
+          prefixes.push(prefix)
+        }
+        setHighlightKey(prefix)
+        setHighlightCount(best.count ?? 0)
+        setCollapsed((current) => {
+          const next = new Set(current)
+          for (const value of prefixes) next.delete(value)
+          return next
+        })
+      }, [data, mode])
+      useEffect(() => {
         onStateChange?.({
           weak,
           page,
@@ -914,8 +958,9 @@ window.__ModuleLoader__.load({
           unreachable: data?.unreachable ?? 0,
           showUnreachable,
           unreachablePage,
+          highlightCount,
         })
-      }, [onStateChange, weak, page, data?.groupCount, data?.reachable, data?.unreachable, showUnreachable, unreachablePage])
+      }, [onStateChange, weak, page, data?.groupCount, data?.reachable, data?.unreachable, showUnreachable, unreachablePage, highlightCount])
       const treeCommandRef = useRef(null)
       useEffect(() => {
         setPage(0)
@@ -977,7 +1022,12 @@ window.__ModuleLoader__.load({
               type: 'button', className: `hp-segment${mode === 'text' ? ' hp-segment-active' : ''}`,
               'aria-pressed': mode === 'text',
               onClick: () => setMode('text'),
-            }, '文本'))),
+            }, '文本')),
+          mode === 'tree' && highlightCount > 0
+            ? h('span', { className: 'hp-highlight-legend', title: '自动高亮当前页按完整路径分组后实例最多的单条 GC 路径' },
+              h('span', { className: 'hp-highlight-swatch', 'aria-hidden': true }),
+              `当前页最大单链 ${highlightCount} 个`)
+            : null),
         data === null
           ? h('div', { style: S.muted }, '加载中…')
           : h('div', null,
@@ -993,9 +1043,11 @@ window.__ModuleLoader__.load({
                     : row.depth === 2
                       ? 'var(--dsw-alias-state-warn-primary)'
                       : 'var(--dsw-alias-label-secondary)'
+                const highlighted = highlightKey !== null
+                  && (row.key === highlightKey || highlightKey.startsWith(`${row.key}\u0000`))
                 return h('div', {
                   key: row.key,
-                  className: `hp-tree-row hp-tree-row-depth-${Math.min(row.depth, 3)}`,
+                  className: `hp-tree-row hp-tree-row-depth-${Math.min(row.depth, 3)}${highlighted ? ' hp-tree-row-highlight' : ''}`,
                 },
                   row.depth > 0
                     ? h('span', { className: 'hp-tree-indents', 'aria-hidden': true },

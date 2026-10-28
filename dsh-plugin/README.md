@@ -182,7 +182,7 @@ hprof_ui(action="showClassPaths", class_id=1877222656, class_name="android.view.
 hprof_ui(action="showUnreachable", class_id=1877222656)
 ```
 
-`showClassPaths` 会展开成 `selectClass → selectTab classpaths → setWeak?`，返回命令 id；它不复制 UI 逻辑。面板执行后会通过 `/ui/ack` 回报，`ui.state.command_status` 可确认 applied；`ui.state.classPaths` 返回 `weak/page/groupCount/reachable/unreachable/showUnreachable`。底层 `hprof_api(op="ui.command")` 和 PTC 的 `hprof.ui.command` 仍然保留，作为完整 escape hatch。`ui.state` 返回 `available_actions`，`ui.manifest` 返回每个 action 的参数、示例和展开步骤。
+`showClassPaths` 会展开成 `selectClass → selectTab classpaths → setWeak?`，返回命令 id；它不复制 UI 逻辑。面板执行后会通过 `/ui/ack` 回报，`ui.state.command_status` 可确认 applied；`ui.state.classPaths` 返回 `weak/page/groupCount/reachable/unreachable/showUnreachable/highlightCount`。树形模式会自动高亮当前页按完整路径分组后实例最多的单条链。底层 `hprof_api(op="ui.command")` 和 PTC 的 `hprof.ui.command` 仍然保留，作为完整 escape hatch。`ui.state` 返回 `available_actions`，`ui.manifest` 返回每个 action 的参数、示例和展开步骤。
 
 `row` 是当前表格选中的 `{table, id, className}`；`filters` 是当前 tab 的过滤条件；`page`/`sort` 是当前分页/排序；`classPaths` 是类路径页的 `weak/page/groupCount/reachable/unreachable/showUnreachable`；`tree.expanded`/`tree.collapsed` 是支配树/类路径树的展开与折叠状态。真正写入 `SessionEventMap` 还需要 Host 侧 session-event seam，当前先用 UI event ledger 代替。
 
