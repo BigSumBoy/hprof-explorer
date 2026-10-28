@@ -891,27 +891,60 @@ window.__ModuleLoader__.load({
 
     function PathTab({ dumpId, objectId, onBack }) {
       const [weak, setWeak] = useState(false)
+      const [allPaths, setAllPaths] = useState(false)
+      const [excludeClasses, setExcludeClasses] = useState('')
+      const [excludeFields, setExcludeFields] = useState('')
+      const query = new URLSearchParams({
+        dump_id: dumpId ?? '',
+        id: String(objectId ?? ''),
+      })
+      if (weak) query.set('weak', '1')
+      if (allPaths) query.set('all', '1')
+      if (excludeClasses.trim() !== '') query.set('exclude_classes', excludeClasses.trim())
+      if (excludeFields.trim() !== '') query.set('exclude_fields', excludeFields.trim())
       const result = useFetch(dumpId && objectId !== null
-        ? `${API}/path?dump_id=${encodeURIComponent(dumpId)}&id=${objectId}${weak ? '&weak=1' : ''}`
+        ? `${API}/path?${query}`
         : null, { cache: true })
       if (result.error !== null) return h('div', { style: S.error }, result.error)
       const data = result.data
+      const paths = data?.paths?.length > 0
+        ? data.paths
+        : (data?.found === true ? [{ path: data.path, distance: data.distance }] : [])
       return h('div', null,
         h('div', { style: S.row },
           h(Btn, { onClick: onBack }, '← 返回'),
           h('span', { style: S.muted }, objectId === null ? '' : hexId(objectId)),
           h('label', { style: { ...S.muted, display: 'flex', gap: 4, alignItems: 'center' } },
             h('input', { type: 'checkbox', checked: weak, onChange: (event) => setWeak(event.target.checked) }),
-            '包含弱引用')),
+            '包含弱引用'),
+          h('label', { style: { ...S.muted, display: 'flex', gap: 4, alignItems: 'center' } },
+            h('input', { type: 'checkbox', checked: allPaths, onChange: (event) => setAllPaths(event.target.checked) }),
+            '全部路径')),
+        h('div', { style: S.row },
+          h('input', {
+            className: 'hp-input', style: { ...S.input, minWidth: 180 }, value: excludeClasses,
+            placeholder: '排除类，逗号分隔', 'aria-label': '排除类',
+            onChange: (event) => setExcludeClasses(event.target.value),
+          }),
+          h('input', {
+            className: 'hp-input', style: { ...S.input, minWidth: 180 }, value: excludeFields,
+            placeholder: '排除字段，逗号分隔', 'aria-label': '排除字段',
+            onChange: (event) => setExcludeFields(event.target.value),
+          }),
+          h('span', { style: S.hint },
+            `${paths.length} 条路径${data?.truncated ? ' · 已截断' : ''}`)),
         data === null
           ? h('div', { style: S.muted }, '加载中…')
           : data.found === false
-            ? h('div', { style: S.muted }, '在强引用视图中不可达（可尝试包含弱引用）')
+            ? h('div', { style: S.muted }, '在强引用视图中不可达（可尝试包含弱引用，或移除排除条件）')
             : h('div', null,
-              h('div', { style: S.hint }, `距离 ${data.distance} 跳`),
-              h('div', { style: S.chain }, (data.path ?? []).map((step, index) => h('div', {
+              h('div', { style: S.hint }, `距离 ${paths[0]?.distance ?? data.distance} 跳`),
+              paths.map((item, pathIndex) => h(Section, {
+                key: pathIndex,
+                title: `路径 ${pathIndex + 1} · ${item.distance} 跳`,
+              }, h('div', { style: S.chain }, (item.path ?? []).map((step, index) => h('div', {
                 key: `${step.id}-${index}`, style: S.chainLine,
-              }, `${index === 0 ? '' : '↳ '}${step.className}${step.id === 0 ? '' : ` @ ${hexId(step.id)}`}${step.via ? `  —(${step.via})→` : ''}`)))))
+              }, `${index === 0 ? '' : '↳ '}${step.className}${step.id === 0 ? '' : ` @ ${hexId(step.id)}`}${step.via ? `  —(${step.via})→` : ''}`)))))))
     }
 
     function ClassPathsTab({ dumpId, classInfo, onBack, onObject, treeCommand, onTreeChange, weakRequest, onStateChange }) {

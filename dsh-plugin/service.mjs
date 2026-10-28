@@ -45,7 +45,7 @@ const CAPABILITIES = {
     'query.roots': 'GC roots. params: { type?, query?, heap?, page?, size?, id_prefix?, dump_id? }',
     'query.retained': 'Retained-size ranking. params: { class_filter?, min_retained?, page?, size?, dump_id? }',
     'query.retainedClasses': 'Top classes by retained size from the dominator ranking. params: { limit?, dump_id? }',
-    'paths.object': 'Shortest GC-root path for one object. params: { id, weak?, dump_id? }',
+    'paths.object': 'GC-root paths for one object; shortest by default, all/exclude options. params: { id, weak?, all?, exclude_classes?, exclude_fields?, limit?, dump_id? }',
     'paths.class': 'Grouped GC-root paths for one class. params: { class_id, kind?, weak?, page?, size?, dump_id? }',
     'analyze.classStats': 'Aggregate reachability, native state, callsites and roots/holders. params: { class_id, kind?, dump_id? }',
     'analyze.leaks': 'Automatic leak suspects: native-heavy and large-container classes. params: { class_id?, limit?, dump_id? }',
@@ -348,6 +348,11 @@ export function createHprofService(runtime, options = {}) {
         return call(params.dump_id, 'path', {
           id: asId(params.id, 'id'),
           weak: params.weak === true,
+          all: params.all === true,
+          exclude_classes: params.exclude_classes,
+          exclude_fields: params.exclude_fields,
+          limit: params.limit,
+          max_depth: params.max_depth,
         }, exec)
       },
       async class(params = {}, exec) {

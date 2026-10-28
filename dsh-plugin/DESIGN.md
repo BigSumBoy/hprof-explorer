@@ -122,6 +122,8 @@ notice
 
 Class-path grouping normalizes array-slot vias (`[12]`, `[214]`, ...) to `[]` before building the signature. This is the MAT-style view: `mCleanupSurfaces -> Object[] -> SurfaceControl` becomes one group with the container's total count, rather than one group per array index.
 
+Single-object path queries can enumerate alternate simple paths and skip excluded classes or reference fields while walking reverse edges. Class-wide path groups still use the shortest-parent tree; all-path enumeration is object-scoped because a class-wide all-path result is unbounded.
+
 `hprof_ui` is the model-first projection over these commands. It uses flat parameters and a closed action enum; high-level actions such as `showClassPaths` and `showUnreachable` expand into the low-level commands above. The low-level `hprof_api` `ui.command` and PTC `hprof.ui.command` remain the complete escape hatch. `ui.manifest` returns the action catalog, and `ui.state` includes `available_actions` and panel ids.
 
 A bounded in-memory event ledger records state reports, command enqueue, and delivery. It is diagnostic, not a session log.

@@ -336,7 +336,14 @@ try {
 
   const gcPath = await call('hprof_path', { dump_id: opened.dump_id, id: big.id })
   assert.equal(gcPath.found, true, 'a retained object must be reachable')
-  console.log(`path: ${gcPath.distance} hops`)
+  const allGcPaths = await call('hprof_path', {
+    dump_id: opened.dump_id,
+    id: big.id,
+    all: true,
+    limit: 5,
+  })
+  assert.ok(Array.isArray(allGcPaths.paths) && allGcPaths.paths.length > 0)
+  console.log(`path: ${gcPath.distance} hops, all-paths ${allGcPaths.totalPaths}`)
 
   const strings = await call('hprof_strings', { dump_id: opened.dump_id, query: '设置', size: 3 })
   assert.ok(strings.items.length > 0, 'expected readable strings')

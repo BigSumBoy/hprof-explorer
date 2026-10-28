@@ -177,6 +177,20 @@ const methods = {
   path(params = {}) {
     const id = Number(params.id)
     if (!Number.isSafeInteger(id) || id < 0) throw new Error('id must be a non-negative integer')
+    const toList = (value) => Array.isArray(value)
+      ? value.map(String).filter(Boolean)
+      : (typeof value === 'string' ? value.split(',').map((part) => part.trim()).filter(Boolean) : [])
+    const excludeClasses = toList(params.exclude_classes ?? params.excludeClasses)
+    const excludeFields = toList(params.exclude_fields ?? params.excludeFields)
+    if (params.all === true || excludeClasses.length > 0 || excludeFields.length > 0) {
+      return idx.pathsToRoot(id, {
+        weak: params.weak === true,
+        limit: params.limit,
+        maxDepth: params.max_depth,
+        excludeClasses,
+        excludeFields,
+      })
+    }
     return idx.pathToRoot(id, params.weak === true)
   },
 

@@ -1081,6 +1081,18 @@ export class HprofIndex {
     }
     for (const [s, t] of weakEdges) allTarget[allCursor[s]++] = t;
 
+    const allRevStart = new Uint32Array(N + 1);
+    for (let e = 0; e < allStart[N]; e++) allRevStart[allTarget[e] + 1]++;
+    for (let i = 1; i <= N; i++) allRevStart[i] += allRevStart[i - 1];
+    const allRevSource = new Uint32Array(allStart[N]);
+    const allRevCursor = allRevStart.slice(0, N);
+    for (let s = 0; s < N; s++) {
+      for (let e = allStart[s]; e < allStart[s + 1]; e++) {
+        const t = allTarget[e];
+        allRevSource[allRevCursor[t]++] = s;
+      }
+    }
+
     const allDist = new Int32Array(N).fill(-1);
     const allParent = new Int32Array(N).fill(-1);
     const allQueue = new Int32Array(N);
@@ -1240,6 +1252,8 @@ export class HprofIndex {
     this.bfsParent = bfsParent;
     this.allBfsDist = allDist;
     this.allBfsParent = allParent;
+    this.allRevStart = allRevStart;
+    this.allRevSource = allRevSource;
     this.weakEdgeCount = weakEdges.length;
     this.domChildHead = domChildHead;
     this.domNext = domNext;
@@ -1456,6 +1470,77 @@ export class HprofIndex {
       groupOffset: offset,
       groups: list.slice(offset, offset + maxGroups),
     };
+  }
+
+  /**
+   * Enumerate simple reference paths to a GC root. Excluded classes and fields
+   * are applied while walking reverse edges, so alternate paths are discovered.
+   */
+  pathsToRoot(id, options = {}) {
+    if (!this.nodeIndex) return null
+    const start = this.nodeIndex.get(id)
+    if (start == null) return null
+    const includeWeak = options.weak === true
+    const revStart = includeWeak ? this.allRevStart : this.revStart
+    const revSource = includeWeak ? this.allRevSource : this.revSource
+    if (!revStart || !revSource) return { found: false, path: [], paths: [], includeWeak }
+    const maxPaths = Math.max(1, Math.min(200, Number(options.limit) || 50))
+    const maxDepth = Math.max(2, Math.min(128, Number(options.maxDepth) || 64))
+    const excludeClasses = new Set((options.excludeClasses ?? []).map((value) => String(value).toLowerCase()))
+    const excludeFields = new Set((options.excludeFields ?? []).map((value) => String(value).toLowerCase()))
+    const found = []
+    const path = [start]
+    const seen = new Set([start])
+    let expanded = 0
+    let truncated = false
+    const walk = (v) => {
+      if (found.length >= maxPaths || path.length > maxDepth || expanded++ > 500_000) {
+        truncated = true
+        return
+      }
+      if (v === 0) {
+        found.push(path.slice())
+        return
+      }
+      for (let e = revStart[v]; e < revStart[v + 1]; e++) {
+        const parent = revSource[e]
+        const parentClass = parent === 0 ? '<root>' : this.objectClassName(this.nodeId[parent])
+        const via = this.edgeLabel(parent, this.nodeId[v])
+        if (excludeClasses.has(parentClass.toLowerCase())) continue
+        if (excludeFields.has(String(via).toLowerCase())) continue
+        if (parent !== 0 && seen.has(parent)) continue
+        path.push(parent)
+        if (parent !== 0) seen.add(parent)
+        walk(parent)
+        if (parent !== 0) seen.delete(parent)
+        path.pop()
+        if (found.length >= maxPaths) break
+      }
+    }
+    walk(start)
+    const paths = found
+      .map((nodes) => {
+        const chain = nodes.slice().reverse()
+        return {
+          distance: chain.length - 1,
+          path: chain.map((node, index) => ({
+            id: node === 0 ? 0 : this.nodeId[node],
+            className: node === 0 ? '<root>' : this.objectClassName(this.nodeId[node]),
+            via: index === 0 ? null : this.edgeLabel(chain[index - 1], this.nodeId[node]),
+          })),
+        }
+      })
+      .sort((a, b) => a.distance - b.distance)
+    return {
+      found: paths.length > 0,
+      path: paths[0]?.path ?? [],
+      paths,
+      totalPaths: paths.length,
+      truncated,
+      includeWeak,
+      excludedClasses: [...excludeClasses],
+      excludedFields: [...excludeFields],
+    }
   }
 
   /** BFS over reverse edges from the object to a GC root / class node. */

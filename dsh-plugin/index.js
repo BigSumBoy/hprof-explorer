@@ -660,7 +660,7 @@ function paramsFromQuery(searchParams) {
       || key === 'parent' || key === 'offset' || key === 'min_bytes' || key === 'min_retained'
       || key === 'min_length') {
       params[key] = Number(value)
-    } else if (key === 'weak' || key === 'readable') {
+    } else if (key === 'weak' || key === 'readable' || key === 'all') {
       params[key] = value === '1' || value === 'true'
     } else {
       params[key] = value
@@ -1026,17 +1026,37 @@ export function createToolDefinitions(runtime, options = {}) {
     definition({
       name: 'hprof_path',
       description:
-        'Shortest GC-root path for one object: the reference chain from a root to the object, with the '
-        + 'field or array index used at each step. Weak references are excluded unless weak is true.',
+        'GC-root paths for one object. By default returns the shortest chain from a root to the object. '
+        + 'Set all=true to enumerate alternate simple paths; exclude_classes/exclude_fields avoid references '
+        + 'through those classes or field names. Weak references are excluded unless weak is true.',
       required: ['id'],
       properties: {
         dump_id: DUMP_ID,
         id: { type: 'number', description: 'Object id.' },
-        weak: { type: 'boolean', description: 'Include Weak/Soft/Phantom reference edges. Default false.' },
+        weak: { type: 'boolean', description: 'Include Weak/Soft/Phantom/Finalizer reference edges. Default false.' },
+        all: { type: 'boolean', description: 'Enumerate all simple paths up to limit, not only the shortest.' },
+        exclude_classes: {
+          type: 'array', items: { type: 'string' },
+          description: 'Class names to exclude while walking toward roots.',
+        },
+        exclude_fields: {
+          type: 'array', items: { type: 'string' },
+          description: 'Reference field labels to exclude, for example mCleanupSurfaces.',
+        },
+        limit: { type: 'number', description: 'Maximum paths to collect (default 50, max 200).' },
+        max_depth: { type: 'number', description: 'Maximum path depth (default 64).' },
       },
       async execute(args, exec) {
         const rec = runtime.pickDump(args?.dump_id)
-        return runtime.call(rec, 'path', { id: asId(args?.id, 'id'), weak: args?.weak === true }, { signal: exec?.signal })
+        return runtime.call(rec, 'path', {
+          id: asId(args?.id, 'id'),
+          weak: args?.weak === true,
+          all: args?.all === true,
+          exclude_classes: Array.isArray(args?.exclude_classes) ? args.exclude_classes.map(String) : [],
+          exclude_fields: Array.isArray(args?.exclude_fields) ? args.exclude_fields.map(String) : [],
+          limit: clamp(args?.limit, 50, 1, 200),
+          max_depth: clamp(args?.max_depth, 64, 2, 128),
+        }, { signal: exec?.signal })
       },
     }),
     definition({
