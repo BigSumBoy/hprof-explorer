@@ -2263,6 +2263,11 @@ window.__ModuleLoader__.load({
       useEffect(() => { void refresh() }, [refresh])
 
       useEffect(() => {
+        const timer = setInterval(() => { void refresh() }, 5_000)
+        return () => clearInterval(timer)
+      }, [refresh])
+
+      useEffect(() => {
         const listener = () => { void refresh() }
         dumpInvalidatedListeners.add(listener)
         return () => { dumpInvalidatedListeners.delete(listener) }
