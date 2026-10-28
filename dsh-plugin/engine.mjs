@@ -311,6 +311,7 @@ const methods = {
     const limit = clamp(params.limit, 5, 1, 20)
     const rows = summary().classes
     const chosen = new Map()
+    const nativeIds = new Set()
     const add = (row) => {
       if (row === undefined || row === null || row.kind !== 'class' || row.count === 0) return
       if (row.name === 'java.lang.String' || row.name.endsWith('[]')) return
@@ -328,6 +329,7 @@ const methods = {
         const count = idx.classAgg.get(`c:${info.id}`)?.count ?? 0
         if (count === 0) continue
         if (!(info.fields ?? []).some((field) => field.name === 'mNativeObject')) continue
+        nativeIds.add(info.id)
         add({ kind: 'class', id: info.id, name: info.name, count, bytes: idx.classAgg.get(`c:${info.id}`)?.bytes ?? 0 })
       }
       for (const name of ['android.view.SurfaceControl', 'android.view.ViewRootImpl', 'java.lang.ref.FinalizerReference', 'sun.misc.Cleaner']) {
@@ -336,7 +338,7 @@ const methods = {
       }
     }
     const candidates = [...chosen.values()]
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => (nativeIds.has(b.id) ? 1 : 0) - (nativeIds.has(a.id) ? 1 : 0) || b.count - a.count)
       .slice(0, params.class_id !== undefined ? 1 : Math.min(12, Math.max(6, limit * 2)))
     const suspects = []
     for (const candidate of candidates) {
@@ -357,7 +359,7 @@ const methods = {
       if (stats.native?.retained > 0) reasons.push(`${stats.native.retained} native handles retained`)
       if (stats.native?.released > stats.native?.retained) reasons.push(`${stats.native.released} released wrappers`)
       if (stats.hidden > 0) reasons.push(`${stats.hidden} hidden objects`)
-      const score = (top?.count ?? 0) * 8 + (stats.native?.retained ?? 0) * 2 + stats.totalObjects
+      const score = (top?.count ?? 0) * 100 + (stats.native?.retained ?? 0) * 20 + Math.min(stats.reachable, 5000)
       suspects.push({
         classId: candidate.id,
         className: candidate.name,

@@ -1200,14 +1200,27 @@ export function createToolDefinitions(runtime, options = {}) {
       properties: {
         dump_id: DUMP_ID,
         class_id: { type: 'number', description: 'Optional class id; omit for automatic candidates.' },
-        limit: { type: 'number', description: 'Maximum suspects (default 5, max 20).' },
+        limit: { type: 'number', description: 'Maximum suspects (default 3, max 20).' },
       },
       async execute(args, exec) {
         const rec = runtime.pickDump(args?.dump_id)
-        return runtime.call(rec, 'leakSuspects', {
+        const result = await runtime.call(rec, 'leakSuspects', {
           class_id: args?.class_id === undefined ? undefined : asId(args.class_id, 'class_id'),
-          limit: clamp(args?.limit, 5, 1, 20),
+          limit: clamp(args?.limit, 3, 1, 20),
         }, { signal: exec?.signal })
+        return {
+          ...result,
+          suspects: (result.suspects ?? []).map((suspect) => ({
+            ...suspect,
+            callsites: (suspect.callsites ?? []).slice(0, 3),
+            topPath: suspect.topPath === null ? null : {
+              ...suspect.topPath,
+              chain: suspect.topPath.chain.length > 900
+                ? `${suspect.topPath.chain.slice(0, 900)}…`
+                : suspect.topPath.chain,
+            },
+          })),
+        }
       },
     }),
     definition({
