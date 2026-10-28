@@ -15,7 +15,7 @@ window.__ModuleLoader__.load({
 
     const API = '/hprof-api'
     const UI_TABS = new Set([
-      'overview', 'classes', 'retained', 'strings', 'roots', 'domtree',
+      'overview', 'classes', 'retained', 'strings', 'roots', 'domtree', 'leaks',
       'findings', 'diff', 'instances', 'path', 'classpaths', 'referrers',
     ])
     const FILTER_TABS = new Set(['classes', 'instances', 'strings', 'roots', 'retained'])
