@@ -43,7 +43,7 @@ The plugin does not start `src/server.mjs`. The Host owns the lifecycle; the par
 
 ## Service first
 
-`service.mjs` is the source of truth. Its manifest currently exposes 29 operations:
+`service.mjs` is the source of truth. Its manifest currently exposes 32 operations:
 
 ```text
 dump.open/list/close/summary
@@ -59,7 +59,7 @@ All consumers project this surface:
 
 | Consumer | Projection |
 |---|---|
-| Model | generic `hprof_api`, flat `hprof_ui` actions, convenience tools (18 tools total) |
+| Model | generic `hprof_api`, flat `hprof_ui` actions, convenience tools (21 tools total) |
 | PTC | `hprof.<group>.<method>` namespace generated from the manifest |
 | Web UI | `/hprof-api` routes and client components |
 | Reports | service `analyze.report` includes findings |
@@ -175,7 +175,7 @@ node dsh-plugin/client-smoke.mjs
 node dsh-plugin/smoke.mjs
 ```
 
-They cover the engine protocol, 18 tools, findings CRUD, report findings section, PTC success/error/timeout, API routes, per-panel UI state, client registration, complete class-path group paging beyond the old 100-group cap, and the default-disabled idle close.
+They cover the engine protocol, 21 tools, findings CRUD, report findings section, PTC success/error/timeout, API routes, per-panel UI state, client registration, complete class-path group paging beyond the old 100-group cap, leak-suspect ranking, grouped histograms, referrer type filtering, retained-set calculation, and the default-disabled idle close.
 
 Live browser verification has covered:
 

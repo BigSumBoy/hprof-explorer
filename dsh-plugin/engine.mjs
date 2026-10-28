@@ -63,6 +63,38 @@ const methods = {
     if (kind !== '') list = list.filter((c) => c.kind === kind)
     if (minCount > 0) list = list.filter((c) => c.count >= minCount)
     if (minBytes > 0) list = list.filter((c) => c.bytes >= minBytes)
+    const groupBy = params.group_by === 'package' || params.group_by === 'classloader' || params.group_by === 'superclass'
+      ? params.group_by
+      : ''
+    if (groupBy !== '') {
+      const grouped = new Map()
+      for (const c of list) {
+        let name
+        if (groupBy === 'package') {
+          const dot = c.name.lastIndexOf('.')
+          name = c.kind === 'primitive' ? '<primitive>'
+            : c.name.endsWith('[]') ? '<array>'
+              : dot <= 0 ? '<default>' : c.name.slice(0, dot)
+        } else if (groupBy === 'superclass') {
+          const info = c.kind === 'class' ? idx.classes.get(c.id) : undefined
+          name = info?.superId ? (idx.classes.get(info.superId)?.name ?? `class ${info.superId}`) : '<none>'
+        } else {
+          const info = c.kind === 'class' ? idx.classes.get(c.id) : undefined
+          const loader = info?.loaderId ? idx.objectClassName(info.loaderId) : null
+          name = loader === null ? '<bootstrap>' : loader
+        }
+        const row = grouped.get(name) ?? { name, kind: 'group', classes: 0, count: 0, bytes: 0 }
+        row.classes++
+        row.count += c.count
+        row.bytes += c.bytes
+        grouped.set(name, row)
+      }
+      let rows = [...grouped.values()]
+      if (sort === 'count') rows.sort((a, b) => b.count - a.count)
+      else if (sort === 'name') rows.sort((a, b) => a.name.localeCompare(b.name))
+      else rows.sort((a, b) => b.bytes - a.bytes)
+      return { total: rows.length, offset, shown: Math.min(limit, Math.max(0, rows.length - offset)), items: rows.slice(offset, offset + limit), groupBy }
+    }
     list = list.slice()
     if (sort === 'count') list.sort((a, b) => b.count - a.count)
     else if (sort === 'name') list.sort((a, b) => a.name.localeCompare(b.name))
@@ -267,7 +299,102 @@ const methods = {
       callsites: [...callsites.values()].sort((a, b) => b.count - a.count),
       roots: [...roots.values()].sort((a, b) => b.count - a.count),
       holders: [...holders.values()].sort((a, b) => b.count - a.count),
+      topPath: paths.groups[0] === undefined ? null : {
+        count: paths.groups[0].count,
+        steps: paths.groups[0].steps,
+        samples: paths.groups[0].samples,
+      },
     }
+  },
+
+  leakSuspects(params = {}) {
+    const limit = clamp(params.limit, 5, 1, 20)
+    const rows = summary().classes
+    const chosen = new Map()
+    const add = (row) => {
+      if (row === undefined || row === null || row.kind !== 'class' || row.count === 0) return
+      if (row.name === 'java.lang.String' || row.name.endsWith('[]')) return
+      if (!chosen.has(row.id)) chosen.set(row.id, row)
+    }
+    if (params.class_id !== undefined) {
+      const id = Number(params.class_id)
+      const row = rows.find((item) => item.kind === 'class' && item.id === id)
+      if (row === undefined) throw new Error('class not found')
+      add(row)
+    } else {
+      for (const row of rows.filter((item) => item.kind === 'class').slice(0, 12)) add(row)
+      for (const row of rows.filter((item) => item.kind === 'class').sort((a, b) => b.count - a.count).slice(0, 12)) add(row)
+      for (const info of idx.classes.values()) {
+        const count = idx.classAgg.get(`c:${info.id}`)?.count ?? 0
+        if (count === 0) continue
+        if (!(info.fields ?? []).some((field) => field.name === 'mNativeObject')) continue
+        add({ kind: 'class', id: info.id, name: info.name, count, bytes: idx.classAgg.get(`c:${info.id}`)?.bytes ?? 0 })
+      }
+      for (const name of ['android.view.SurfaceControl', 'android.view.ViewRootImpl', 'java.lang.ref.FinalizerReference', 'sun.misc.Cleaner']) {
+        const row = rows.find((item) => item.kind === 'class' && item.name === name)
+        if (row !== undefined) add(row)
+      }
+    }
+    const candidates = [...chosen.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, params.class_id !== undefined ? 1 : Math.min(12, Math.max(6, limit * 2)))
+    const suspects = []
+    for (const candidate of candidates) {
+      let stats
+      try {
+        stats = methods.classStats({ class_id: candidate.id, kind: 'class' })
+      } catch {
+        continue
+      }
+      const top = stats.topPath
+      const first = top?.steps?.[1]
+      const last = top?.steps?.[top.steps.length - 2]
+      const chain = top === null || top === undefined ? null : top.steps
+        .map((step, index) => (index === 0 ? '<root>' : `${step.className} <- ${step.via ?? '?'}`))
+        .join(' | ')
+      const reasons = []
+      if (top !== null && top !== undefined && top.count >= 10) reasons.push(`top path holds ${top.count} objects`)
+      if (stats.native?.retained > 0) reasons.push(`${stats.native.retained} native handles retained`)
+      if (stats.native?.released > stats.native?.retained) reasons.push(`${stats.native.released} released wrappers`)
+      if (stats.hidden > 0) reasons.push(`${stats.hidden} hidden objects`)
+      const score = (top?.count ?? 0) * 8 + (stats.native?.retained ?? 0) * 2 + stats.totalObjects
+      suspects.push({
+        classId: candidate.id,
+        className: candidate.name,
+        score,
+        totalObjects: stats.totalObjects,
+        reachable: stats.reachable,
+        unreachable: stats.unreachable,
+        native: stats.native,
+        hidden: stats.hidden,
+        callsites: stats.callsites.slice(0, 5),
+        topPath: top === null || top === undefined ? null : {
+          count: top.count,
+          root: first?.className ?? null,
+          holder: last?.className ?? null,
+          chain,
+          samples: top.samples?.slice(0, 3) ?? [],
+        },
+        reasons,
+      })
+    }
+    suspects.sort((a, b) => b.score - a.score)
+    return {
+      suspects: suspects.slice(0, limit),
+      candidatesAnalyzed: candidates.length,
+      note: 'Heuristic suspects rank native/finalizer holders and the largest aggregated GC-root container per class.',
+    }
+  },
+
+  retainedSet(params = {}) {
+    const ids = Array.isArray(params.ids) ? params.ids.map(Number).filter((id) => Number.isSafeInteger(id) && id >= 0) : []
+    if (ids.length === 0) throw new Error('ids must be a non-empty array of object ids')
+    const limit = clamp(params.limit, 20000, 1, 100000)
+    return idx.retainedSet(ids, limit)
+  },
+
+  retainedClasses(params = {}) {
+    return idx.retainedClasses(clamp(params.limit, 30, 1, 200))
   },
 
   retained(params = {}) {
@@ -314,7 +441,13 @@ const methods = {
   referrers(params = {}) {
     const id = Number(params.id)
     if (!Number.isSafeInteger(id) || id < 0) throw new Error('id must be a non-negative integer')
-    return idx.referrers(id)
+    const page = clamp(params.page, 0, 0, 1_000_000)
+    const size = clamp(params.size, 100, 1, 500)
+    return idx.referrers(id, size, 5_000, {
+      offset: page * size,
+      type: params.type,
+      field: params.field,
+    })
   },
 
   /**

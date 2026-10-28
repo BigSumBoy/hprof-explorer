@@ -112,6 +112,11 @@ window.__ModuleLoader__.load({
 .hp-tree-row-highlight .hp-tree-count { background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); }
 .hp-highlight-legend { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--dsw-alias-brand-primary) 7%, var(--dsw-alias-bg-layer-1)); color: var(--dsw-alias-brand-primary); font-size: 11px; font-weight: 500; white-space: nowrap; }
 .hp-highlight-swatch { width: 7px; height: 7px; border-radius: 2px; background: var(--dsw-alias-brand-primary); }
+.hp-ref-type { display: inline-flex; padding: 1px 6px; border-radius: 999px; background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-secondary); font-size: 10px; font-weight: 500; }
+.hp-suspect-card { padding: 10px 12px; border: 1px solid var(--dsw-alias-border-l2); border-left: 3px solid var(--dsw-alias-brand-primary); border-radius: 7px; background: var(--dsw-alias-bg-layer-1); }
+.hp-suspect-rank { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--dsw-alias-brand-primary); color: var(--dsw-alias-bg-base); font-size: 11px; font-weight: 500; }
+.hp-suspect-score { color: var(--dsw-alias-label-secondary); font-size: 11px; font-weight: 500; }
+.hp-suspect-reason { display: inline-flex; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--dsw-alias-state-warn-primary) 10%, var(--dsw-alias-bg-layer-2)); color: var(--dsw-alias-state-warn-primary); font-size: 10px; font-weight: 500; }
 .hp-filter { position: relative; display: flex; align-items: center; }
 .hp-filter-icon { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); width: 11px; height: 11px; color: var(--dsw-alias-label-secondary); pointer-events: none; }
 .hp-filter-prefix { position: absolute; left: 5px; top: 50%; transform: translateY(-50%); font-size: 10px; line-height: 1; color: var(--dsw-alias-label-secondary); pointer-events: none; }
@@ -637,10 +642,12 @@ window.__ModuleLoader__.load({
 
     function ClassesTab({ dumpId, onClass, onClassPaths, onSelectRow, onFiltersChange, initialFilters, selectedRowId, initialSort, onViewChange }) {
       const [sort, setSort] = useState(initialSort ?? 'bytes')
+      const [groupBy, setGroupBy] = useState('')
       const { filters, applied, set } = useFilters({ query: '', kind: '', minCount: '', minBytes: '', ...(initialFilters ?? {}) })
       useEffect(() => { onFiltersChange?.('classes', applied) }, [applied, onFiltersChange])
-      useEffect(() => { onViewChange?.('classes', { sort }) }, [sort, onViewChange])
+      useEffect(() => { onViewChange?.('classes', { sort, groupBy }) }, [sort, groupBy, onViewChange])
       const params = new URLSearchParams({ dump_id: dumpId ?? '', sort, limit: '200' })
+      if (groupBy !== '') params.set('group_by', groupBy)
       if (applied.query !== '') params.set('query', applied.query)
       if (applied.kind !== '') params.set('kind', applied.kind)
       if (applied.minCount !== '' && Number.isFinite(Number(applied.minCount))) params.set('min_count', String(Number(applied.minCount)))
@@ -648,20 +655,34 @@ window.__ModuleLoader__.load({
       const result = useFetch(dumpId ? `${API}/classes?${params}` : null)
       if (result.error !== null) return h('div', { style: S.error }, result.error)
       const items = result.data?.items ?? []
+      const grouped = groupBy !== ''
+      const columns = grouped
+        ? [
+          { key: 'name', title: '分组', render: (row) => h('span', { style: S.mono }, row.name) },
+          { key: 'classes', title: '类数', align: 'right' },
+          { key: 'count', title: '实例', align: 'right' },
+          { key: 'bytes', title: '字节', align: 'right', render: (row) => formatBytes(row.bytes) },
+        ]
+        : [
+          { key: 'name', title: '类', render: (row) => h('span', { style: S.mono }, row.name) },
+          { key: 'kind', title: '类型' },
+          { key: 'count', title: '实例', align: 'right' },
+          { key: 'bytes', title: '字节', align: 'right', render: (row) => formatBytes(row.bytes) },
+        ]
       return h('div', null,
         h('div', { style: S.row },
           h('select', { className: 'hp-select', style: S.select, value: sort, onChange: (event) => setSort(event.target.value) },
             h('option', { value: 'bytes' }, '按字节'),
             h('option', { value: 'count' }, '按实例数'),
             h('option', { value: 'name' }, '按名称')),
-          h('span', { style: S.muted }, result.loading ? '加载中…' : `${result.data?.total ?? 0} 个类 · 显示前 ${items.length}`)),
-        h(Section, { title: '类' }, h(Table, {
-          columns: [
-            { key: 'name', title: '类', render: (row) => h('span', { style: S.mono }, row.name) },
-            { key: 'kind', title: '类型' },
-            { key: 'count', title: '实例', align: 'right' },
-            { key: 'bytes', title: '字节', align: 'right', render: (row) => formatBytes(row.bytes) },
-          ],
+          h('select', { className: 'hp-select', style: S.select, value: groupBy, onChange: (event) => setGroupBy(event.target.value) },
+            h('option', { value: '' }, '按类'),
+            h('option', { value: 'package' }, '按包'),
+            h('option', { value: 'classloader' }, '按 ClassLoader'),
+            h('option', { value: 'superclass' }, '按父类')),
+          h('span', { style: S.muted }, result.loading ? '加载中…' : `${result.data?.total ?? 0} ${grouped ? '个分组' : '个类'} · 显示 ${items.length}`)),
+        h(Section, { title: grouped ? '类分组' : '类' }, h(Table, {
+          columns,
           filters: [
             { value: filters.query, onChange: (value) => set('query', value), placeholder: '搜索类名' },
             { value: filters.kind, onChange: (value) => set('kind', value), placeholder: '搜索类型' },
@@ -669,15 +690,15 @@ window.__ModuleLoader__.load({
             { value: filters.minBytes, onChange: (value) => set('minBytes', value), placeholder: '最小字节', type: 'number' },
           ],
           rows: items,
-          onRowClick: (row) => onClass(row),
-          onRowSelect: (row) => onSelectRow?.('classes', row),
-          selectedRowId,
-          rowActions: (row) => h('button', {
+          onRowClick: grouped ? undefined : (row) => onClass(row),
+          onRowSelect: grouped ? undefined : (row) => onSelectRow?.('classes', row),
+          selectedRowId: grouped ? null : selectedRowId,
+          rowActions: grouped ? undefined : (row) => h('button', {
             type: 'button', className: 'hp-action',
             onClick: (event) => { event.stopPropagation(); onClassPaths(row) },
             onDoubleClick: (event) => event.stopPropagation(),
           }, 'GC 路径'),
-          empty: '没有匹配的类',
+          empty: grouped ? '没有匹配的分组' : '没有匹配的类',
         })))
     }
 
@@ -1295,39 +1316,67 @@ window.__ModuleLoader__.load({
     }
 
     function ReferrersTab({ dumpId, objectId, onObject, onBack, onSelectRow, selectedRowId }) {
+      const [page, setPage] = useState(0)
+      const [type, setType] = useState('all')
+      const [field, setField] = useState('')
       const result = useFetch(dumpId && objectId !== null
-        ? `${API}/referrers?dump_id=${encodeURIComponent(dumpId)}&id=${objectId}`
+        ? `${API}/referrers?dump_id=${encodeURIComponent(dumpId)}&id=${objectId}&page=${page}&size=100&type=${encodeURIComponent(type)}&field=${encodeURIComponent(field)}`
         : null, { cache: true })
       if (result.error !== null) return h('div', { style: S.error }, result.error)
       const data = result.data
       const items = data?.items ?? []
+      const total = data?.total
+      const hasMore = data?.truncated === true || (typeof total === 'number' && (page + 1) * 100 < total)
       return h('div', null,
         h('div', { style: S.row },
           h(Btn, { onClick: onBack }, '← 返回'),
-          h('span', { style: S.muted }, objectId === null ? '' : `谁引用 ${hexId(objectId)}`)),
+          h('span', { style: S.muted }, objectId === null ? '' : `谁引用 ${hexId(objectId)}`),
+          h('select', {
+            className: 'hp-select', style: S.select, value: type,
+            onChange: (event) => { setPage(0); setType(event.target.value) },
+          },
+            h('option', { value: 'all' }, '全部引用'),
+            h('option', { value: 'strong' }, '强引用'),
+            h('option', { value: 'weak' }, '弱引用'),
+            h('option', { value: 'soft' }, '软引用'),
+            h('option', { value: 'phantom' }, '虚引用'),
+            h('option', { value: 'final' }, 'Finalizer/Cleaner')),
+          h('input', {
+            className: 'hp-input', style: { ...S.input, minWidth: 120 }, value: field,
+            placeholder: '字段名过滤', 'aria-label': '引用字段过滤',
+            onChange: (event) => { setPage(0); setField(event.target.value) },
+          })),
         data === null
           ? h('div', { style: S.muted }, '加载中…')
           : h('div', null,
             h('div', { style: S.hint },
-              `${items.length} 条${data.truncated ? '（已截断）' : ''} · 扫描 ${data.tookMs} ms`),
+              `第 ${page + 1} 页 · ${items.length} 条${total === null || total === undefined ? '（未扫描完）' : ` / ${total}`}${data.truncated ? ' · 已截断' : ''} · 扫描 ${data.tookMs} ms`),
             h(Section, { title: '引用者' }, h(Table, {
               columns: [
                 { key: 'id', title: '对象', render: (row) => h('span', { style: S.mono }, hexId(row.id)) },
                 { key: 'className', title: '类' },
                 { key: 'field', title: '字段/下标' },
+                { key: 'type', title: '类型', render: (row) => h('span', { className: 'hp-ref-type' }, row.type ?? 'strong') },
               ],
-              rows: items.slice(0, 200),
+              rows: items,
               onRowClick: (row) => onObject(row.id),
               onRowSelect: (row) => onSelectRow?.('referrers', row),
               selectedRowId,
               empty: '没有找到引用者',
-            }))))
+            })),
+            h('div', { style: { ...S.row, marginTop: 8 } },
+              h(Btn, { onClick: () => setPage((value) => Math.max(0, value - 1)), disabled: page === 0 }, '上一页'),
+              h('span', { style: S.muted }, `第 ${page + 1} 页`),
+              h(Btn, { onClick: () => setPage((value) => value + 1), disabled: !hasMore }, '下一页'))))
     }
 
-    function DomTreeTab({ dumpId, rootId, onObject, treeCommand, onTreeChange }) {
+    function DomTreeTab({ dumpId, rootId, onObject, treeCommand, onTreeChange, retainedSet, retainedSetLoading, onRetainedSet }) {
       const [root, setRoot] = useState(rootId ?? 0)
       const [filter, setFilter] = useState('')
       const [expanded, setExpanded] = useState(() => new Set())
+      const retainedClasses = useFetch(dumpId
+        ? `${API}/retained-classes?dump_id=${encodeURIComponent(dumpId)}&limit=12`
+        : null, { cache: true })
       useEffect(() => { setRoot(rootId ?? 0) }, [rootId])
       useEffect(() => { setExpanded(new Set()) }, [root, dumpId])
       useEffect(() => { onTreeChange?.([...expanded]) }, [expanded, onTreeChange])
@@ -1357,6 +1406,9 @@ window.__ModuleLoader__.load({
       if (result.error !== null) return h('div', { style: S.error }, result.error)
       const data = result.data
       const items = (data?.items ?? []).filter((node) => nodeMatches(node, filter))
+      const retainedClassRows = Array.isArray(retainedClasses.data)
+        ? retainedClasses.data
+        : (retainedClasses.data?.items ?? [])
       return h('div', null,
         h('div', { style: S.row },
           h(Btn, { onClick: () => setRoot(0) }, '回到根'),
@@ -1373,12 +1425,38 @@ window.__ModuleLoader__.load({
               onChange: (event) => setFilter(event.target.value),
             })),
           h('span', { style: S.muted }, `${data?.total ?? 0} 个子节点`)),
+        retainedClassRows.length === 0 ? null : h(Section, { title: 'Top Retained 类' }, h(Table, {
+          columns: [
+            { key: 'className', title: '类', render: (row) => h('span', { style: S.mono }, row.className) },
+            { key: 'count', title: '对象数', align: 'right' },
+            { key: 'retained', title: 'Retained 总和', align: 'right', render: (row) => formatBytes(row.retained) },
+          ],
+          rows: retainedClassRows,
+          onRowClick: (row) => onObject(row.topObjectId),
+          empty: '没有 retained 类',
+        })),
+        retainedSetLoading
+          ? h('div', { style: S.muted }, '正在计算 Retained Set…')
+          : retainedSet === null
+            ? null
+            : h(Section, { title: `Retained Set · 根对象 ${hexId(retainedSet.sourceId)}` },
+              h('div', { style: S.hint },
+                `${retainedSet.totalObjects} 个对象 · shallow ${formatBytes(retainedSet.shallow)}`
+                + (retainedSet.truncated ? ' · 已截断' : '')),
+              h(Table, {
+                columns: [
+                  { key: 'className', title: '类', render: (row) => h('span', { style: S.mono }, row.className) },
+                  { key: 'count', title: '对象数', align: 'right' },
+                  { key: 'retained', title: 'Retained 总和', align: 'right', render: (row) => formatBytes(row.retained) },
+                ],
+                rows: (retainedSet.classes ?? []).slice(0, 10),
+              })),
         data === null
           ? h('div', { style: S.muted }, '加载中…')
           : h('div', { style: { marginTop: 8 } },
             items.map((node) => h(DomNode, {
               key: node.id, dumpId, node, depth: 0, onObject, filter,
-              expanded, onToggle: toggleNode,
+              expanded, onToggle: toggleNode, onRetainedSet,
             }))))
     }
 
@@ -1389,7 +1467,7 @@ window.__ModuleLoader__.load({
       return String(node.className).toLowerCase().includes(needle) || hexId(node.id).toLowerCase().includes(needle)
     }
 
-    function DomNode({ dumpId, node, depth, onObject, filter, expanded, onToggle }) {
+    function DomNode({ dumpId, node, depth, onObject, filter, expanded, onToggle, onRetainedSet }) {
       const open = expanded.has(node.id)
       const [offset, setOffset] = useState(0)
       const children = useFetch(open && dumpId
@@ -1425,13 +1503,18 @@ window.__ModuleLoader__.load({
           }, node.className),
           h('span', { className: 'hp-tree-id' }, hexId(node.id)),
           h('span', { style: { flex: 1 } }),
+          h('button', {
+            type: 'button', className: 'hp-action hp-action-quiet',
+            title: '计算该对象支配的 Retained Set',
+            onClick: (event) => { event.stopPropagation(); onRetainedSet?.(node.id) },
+          }, 'RS'),
           h('span', { className: 'hp-tree-metric' }, `retained ${formatBytes(node.retained)}`),
           h('span', { className: 'hp-tree-metric' }, `shallow ${formatBytes(node.shallow)}`)),
         open ? h('div', null,
           children.error !== null ? h('div', { style: S.error }, children.error) : null,
           children.data === null ? h('div', { style: { ...S.muted, paddingLeft: (depth + 1) * 14 + 22 } }, '加载中…') : null,
           (children.data?.items ?? []).filter((child) => nodeMatches(child, filter)).map((child) => h(DomNode, {
-            key: child.id, dumpId, node: child, depth: depth + 1, onObject, filter, expanded, onToggle,
+            key: child.id, dumpId, node: child, depth: depth + 1, onObject, filter, expanded, onToggle, onRetainedSet,
           })),
           children.data !== null && children.data.total > offset + 100
             ? h('button', {
@@ -1672,6 +1755,56 @@ window.__ModuleLoader__.load({
           d: 'M4 6h3.5M4 9h2.5M10 5.5l1.8 2.5L10 10.5',
           stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
         }))
+    }
+
+    function LeaksTab({ dumpId, onClass, onClassPaths }) {
+      const [nonce, setNonce] = useState(0)
+      const result = useFetch(dumpId ? `${API}/leaks?dump_id=${encodeURIComponent(dumpId)}&limit=8&_=${nonce}` : null)
+      if (result.error !== null) return h('div', { style: S.error }, result.error)
+      const data = result.data
+      const suspects = data?.suspects ?? []
+      return h('div', null,
+        h('div', { style: S.row },
+          h(Btn, { onClick: () => setNonce((value) => value + 1), disabled: result.loading }, result.loading ? '分析中…' : '重新分析'),
+          h('span', { style: S.hint },
+            '按最大聚合根容器、native retained、hidden 和 released wrapper 排序；分析可能需几秒。')),
+        data === null
+          ? h('div', { style: S.muted }, '自动分析中…')
+          : suspects.length === 0
+            ? h('div', { style: S.muted }, '没有发现明显嫌疑。')
+            : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+              suspects.map((suspect, index) => h('div', {
+                key: `${suspect.classId}-${index}`,
+                className: 'hp-suspect-card',
+              },
+                h('div', { style: { ...S.row, justifyContent: 'space-between' } },
+                  h('div', { style: { ...S.row, gap: 8 } },
+                    h('span', { className: 'hp-suspect-rank' }, `#${index + 1}`),
+                    h('span', { style: { ...S.mono, fontSize: 13 } }, suspect.className)),
+                  h('span', { className: 'hp-suspect-score' }, `score ${suspect.score}`)),
+                h('div', { style: { ...S.hint, marginTop: 4 } },
+                  `${suspect.totalObjects} 对象 · 强可达 ${suspect.reachable} · 不可达 ${suspect.unreachable}`
+                  + ` · native retained ${suspect.native?.retained ?? 0} / released ${suspect.native?.released ?? 0}`
+                  + ` · hidden ${suspect.hidden ?? 0}`),
+                suspect.reasons.length > 0
+                  ? h('div', { style: { ...S.row, gap: 5, marginTop: 2 } },
+                    suspect.reasons.map((reason, reasonIndex) => h('span', {
+                      key: reasonIndex, className: 'hp-suspect-reason',
+                    }, reason)))
+                  : null,
+                suspect.topPath === null
+                  ? null
+                  : h('div', { style: { marginTop: 6 } },
+                    h('div', { style: S.hint }, `Top container: ${suspect.topPath.count} 个`),
+                    h('div', { style: S.chain },
+                      suspect.topPath.chain.split(' | ').map((step, stepIndex) => h('div', {
+                        key: stepIndex, style: S.chainLine,
+                      }, step)))),
+                h('div', { style: { ...S.row, marginTop: 6 } },
+                  h(Btn, { onClick: () => onClass({ id: suspect.classId, name: suspect.className, kind: 'class' }) }, '查看类'),
+                  h(Btn, {
+                    onClick: () => onClassPaths({ id: suspect.classId, name: suspect.className, kind: 'class' }),
+                  }, 'GC 路径'))))))
     }
 
     function FindingsTab({ dumpId, currentObjectId, currentClassInfo, onObject, onClass }) {
@@ -2050,6 +2183,8 @@ window.__ModuleLoader__.load({
       const [treeCommand, setTreeCommand] = useState(null)
       const [weakRequest, setWeakRequest] = useState(null)
       const [classPathState, setClassPathState] = useState(null)
+      const [retainedSet, setRetainedSet] = useState(null)
+      const [retainedSetLoading, setRetainedSetLoading] = useState(false)
       const [chatDraftCommand, setChatDraftCommand] = useState(null)
       const [mountNonce, setMountNonce] = useState(0)
       const viewStorageRef = useRef(null)
@@ -2163,6 +2298,21 @@ window.__ModuleLoader__.load({
       const activeDumpId = dumpsLoaded && dumpId !== null && dumps.some((dump) => dump.dump_id === dumpId)
         ? dumpId
         : null
+      const computeRetainedSet = useCallback(async (id) => {
+        if (activeDumpId === null) return
+        setRetainedSetLoading(true)
+        try {
+          const result = await api('/retained-set', {
+            method: 'POST',
+            body: { dump_id: activeDumpId, ids: [id] },
+          })
+          setRetainedSet({ ...result, sourceId: id })
+        } catch (cause) {
+          setError(String(cause?.message ?? cause))
+        } finally {
+          setRetainedSetLoading(false)
+        }
+      }, [activeDumpId])
       viewStorageRef.current = dumps.find((dump) => dump.dump_id === activeDumpId)?.file ?? activeDumpId
 
       useEffect(() => {
@@ -2172,6 +2322,7 @@ window.__ModuleLoader__.load({
         setTreeExpanded([])
         setClassPathCollapsed([])
         setClassPathState(null)
+        setRetainedSet(null)
         setTreeCommand(null)
       }, [activeDumpId])
 
@@ -2513,7 +2664,7 @@ window.__ModuleLoader__.load({
       const drillDown = tab === 'instances' || tab === 'path'
         || tab === 'classpaths' || tab === 'referrers'
       const tabs = [
-        ['overview', '概览'], ['classes', '类'], ['retained', 'Retained'],
+        ['overview', '概览'], ['classes', '类'], ['retained', 'Retained'], ['leaks', '泄漏嫌疑'],
         ['strings', '字符串'], ['roots', 'Roots'], ['domtree', '支配树'],
         ['findings', '发现'], ['diff', '差分'],
       ]
@@ -2540,6 +2691,7 @@ window.__ModuleLoader__.load({
         overview: '概览',
         classes: '类',
         retained: 'Retained',
+        leaks: '泄漏嫌疑',
         strings: '字符串',
         roots: 'GC Roots',
         domtree: '支配树',
@@ -2577,9 +2729,13 @@ window.__ModuleLoader__.load({
         initialFilters: initialFiltersFor('roots'), selectedRowId: selectedRowIdFor('roots'),
         initialPage: initialPageFor('roots'), onViewChange: handleViewChange,
       })
+      else if (tab === 'leaks') body = h(LeaksTab, {
+        dumpId: activeDumpId, onClass: openClass, onClassPaths: openClassPaths,
+      })
       else if (tab === 'domtree') body = h(DomTreeTab, {
         dumpId: activeDumpId, rootId: domRoot, onObject: openObject,
         treeCommand, onTreeChange: handleTreeChange,
+        retainedSet, retainedSetLoading, onRetainedSet: computeRetainedSet,
       })
       else if (tab === 'findings') body = h(FindingsTab, {
         dumpId: activeDumpId,

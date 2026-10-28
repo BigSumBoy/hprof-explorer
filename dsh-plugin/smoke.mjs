@@ -108,6 +108,36 @@ try {
     + `${stats.native.retained} native, ${stats.native.released} released, ${stats.groupCount} groups`,
   )
 
+  const grouped = await call('hprof_classes', {
+    dump_id: opened.dump_id,
+    group_by: 'package',
+    limit: 5,
+  })
+  assert.equal(grouped.groupBy, 'package')
+  assert.ok(grouped.items.length > 0 && grouped.items[0].classes > 0)
+
+  const leaks = await call('hprof_leaks', {
+    dump_id: opened.dump_id,
+    class_id: surface.id,
+    limit: 3,
+  })
+  assert.ok(Array.isArray(leaks.suspects) && leaks.suspects.length > 0)
+  assert.equal(leaks.suspects[0].classId, surface.id)
+  const autoLeaks = await call('hprof_leaks', { dump_id: opened.dump_id, limit: 3 })
+  assert.ok(Array.isArray(autoLeaks.suspects) && autoLeaks.suspects.length > 0)
+
+  const retainedForSet = await call('hprof_retained', {
+    dump_id: opened.dump_id,
+    limit: 2,
+  })
+  if (retainedForSet.items.length > 0) {
+    const retainedSet = await call('hprof_retained_set', {
+      dump_id: opened.dump_id,
+      ids: [retainedForSet.items[0].id],
+    })
+    assert.ok(retainedSet.totalObjects >= 1)
+  }
+
   const firstPage = await call('hprof_class_paths', {
     dump_id: opened.dump_id,
     class_id: surface.id,
@@ -380,10 +410,29 @@ async function exerciseRoutes(runtime) {
   const filteredInstances = await get(handler, `/hprof-api/instances?dump_id=${dumps.dumps[0].dump_id}&class_id=${classes.items[0].id}&kind=${classes.items[0].kind}&query=${encodeURIComponent(classes.items[0].name)}&size=3`)
   assert.ok(Array.isArray(filteredInstances.items))
 
+  const groupedClasses = await get(handler, `/hprof-api/classes?dump_id=${dumps.dumps[0].dump_id}&group_by=package&limit=5`)
+  assert.equal(groupedClasses.groupBy, 'package')
+  assert.ok(groupedClasses.items.length > 0 && groupedClasses.items[0].classes > 0)
+
+  const retainedClasses = await get(handler, `/hprof-api/retained-classes?dump_id=${dumps.dumps[0].dump_id}&limit=3`)
+  assert.ok(Array.isArray(retainedClasses) && retainedClasses.length > 0)
+
   const retained = await get(handler, `/hprof-api/retained?dump_id=${dumps.dumps[0].dump_id}&size=3`)
   assert.ok(retained.items.length === 3)
 
   const first = retained.items[0]
+  const retainedSet = await post(handler, '/hprof-api/retained-set', {
+    dump_id: dumps.dumps[0].dump_id,
+    ids: [first.id],
+  })
+  assert.ok(retainedSet.totalObjects >= 1)
+
+  const surfaceRoute = await get(handler, `/hprof-api/classes?dump_id=${dumps.dumps[0].dump_id}&query=SurfaceControl&kind=class&limit=3`)
+  if (surfaceRoute.items.length > 0) {
+    const leakRoute = await get(handler, `/hprof-api/leaks?dump_id=${dumps.dumps[0].dump_id}&class_id=${surfaceRoute.items[0].id}&limit=2`)
+    assert.ok(Array.isArray(leakRoute.suspects) && leakRoute.suspects.length > 0)
+  }
+
   const object = await get(handler, `/hprof-api/object?dump_id=${dumps.dumps[0].dump_id}&id=${first.id}`)
   assert.equal(object.id, first.id)
 

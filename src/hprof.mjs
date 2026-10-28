@@ -863,39 +863,72 @@ export class HprofIndex {
     return { total: items.length, page, pageSize, items: items.slice(start, start + pageSize) };
   }
 
-  referrers(target, limit = 200, maxMs = 3000) {
-    const started = Date.now();
-    const out = [];
-    let truncated = false;
-    const className = (id) => this.objectClassName(id);
-    for (const [id, off] of this.objects) {
-      if (out.length >= limit || Date.now() - started > maxMs) {
-        truncated = true;
-        break;
+  referrers(target, limit = 200, maxMs = 3000, options = {}) {
+    const started = Date.now()
+    const offset = Math.max(0, Number(options.offset) || 0)
+    const wanted = offset + Math.max(1, Math.min(500, Number(limit) || 200))
+    const typeFilter = String(options.type ?? 'all').toLowerCase()
+    const fieldFilter = String(options.field ?? '').toLowerCase()
+    const out = []
+    let matched = 0
+    let truncated = false
+    const className = (id) => this.objectClassName(id)
+    const typeOf = (referrerClass, fieldWeak) => {
+      if (fieldWeak) {
+        if (referrerClass === 'java.lang.ref.SoftReference') return 'soft'
+        if (referrerClass === 'java.lang.ref.PhantomReference') return 'phantom'
+        if (referrerClass === 'java.lang.ref.FinalizerReference' || referrerClass === 'sun.misc.Cleaner') return 'final'
+        return 'weak'
       }
-      if (id === target) continue;
-      const tag = this.buf[off];
+      return 'strong'
+    }
+    const keep = (item, referrerClass, fieldWeak) => {
+      const type = typeOf(referrerClass, fieldWeak)
+      item.type = type
+      if (typeFilter !== 'all' && type !== typeFilter) return false
+      if (fieldFilter !== '' && !String(item.field).toLowerCase().includes(fieldFilter)) return false
+      return true
+    }
+    const push = (item, referrerClass, fieldWeak) => {
+      if (!keep(item, referrerClass, fieldWeak)) return
+      matched++
+      if (out.length < wanted) out.push(item)
+    }
+    for (const [id, off] of this.objects) {
+      if (out.length >= wanted || Date.now() - started > maxMs) {
+        truncated = out.length >= wanted || Date.now() - started > maxMs
+        break
+      }
+      if (id === target) continue
+      const tag = this.buf[off]
+      const referrerClass = className(id)
       if (tag === HEAP.INSTANCE_DUMP) {
-        const fields = this.instanceFields(id);
+        const fields = this.instanceFields(id)
         for (const f of fields) {
-          if (f.type !== 'object' || f.value !== target) continue;
-          out.push({ id, className: className(id), field: f.name });
+          if (f.type !== 'object' || f.value !== target) continue
+          push({ id, className: referrerClass, field: f.name }, referrerClass, f.weak === true)
         }
       } else if (tag === HEAP.OBJECT_ARRAY_DUMP) {
-        const len = this.buf.readUInt32BE(off + 9);
+        const len = this.buf.readUInt32BE(off + 9)
         for (let i = 0; i < len; i++) {
-          if (this.buf.readUInt32BE(off + 17 + i * 4) === target) {
-            out.push({ id, className: className(id), field: `[${i}]` });
-          }
+          if (this.buf.readUInt32BE(off + 17 + i * 4) !== target) continue
+          push({ id, className: referrerClass, field: `[${i}]` }, referrerClass, false)
         }
       }
     }
     for (const cls of this.classes.values()) {
       for (const s of cls.statics) {
-        if (s.type === 2 && s.value === target) out.push({ id: cls.id, className: cls.name, field: `static ${s.name}` });
+        if (s.type === 2 && s.value === target) push({ id: cls.id, className: cls.name, field: `static ${s.name}` }, cls.name, false)
       }
     }
-    return { target, items: out, truncated, tookMs: Date.now() - started };
+    return {
+      target,
+      items: out.slice(offset, offset + Math.max(1, Number(limit) || 200)),
+      total: truncated ? null : matched,
+      offset,
+      truncated,
+      tookMs: Date.now() - started,
+    }
   }
 
   /**
@@ -1261,6 +1294,75 @@ export class HprofIndex {
         children: this.domChildCount[v],
       })),
     };
+  }
+
+  /**
+   * Objects dominated by the requested object set, with class and object
+   * summaries. The set is a union, so selecting nested dominators is safe.
+   */
+  retainedSet(ids, limit = 20000) {
+    if (!this.nodeIndex || !this.domChildHead) return null
+    const starts = []
+    for (const raw of ids) {
+      const node = this.nodeIndex.get(Number(raw))
+      if (node !== undefined && node > 0) starts.push(node)
+    }
+    if (starts.length === 0) return { requested: 0, found: 0, totalObjects: 0, shallow: 0, truncated: false, classes: [], objects: [] }
+    const seen = new Uint8Array(this.nodeId.length)
+    const stack = [...starts]
+    const objects = []
+    const classes = new Map()
+    let shallow = 0
+    let truncated = false
+    while (stack.length > 0) {
+      const v = stack.pop()
+      if (seen[v] === 1) continue
+      seen[v] = 1
+      if (objects.length >= limit) {
+        truncated = true
+        break
+      }
+      const id = this.nodeId[v]
+      const className = this.objectClassName(id)
+      const size = this.shallow[v]
+      shallow += size
+      objects.push({ id, className, shallow: size, retained: this.retained[v] })
+      const row = classes.get(className) ?? { className, count: 0, shallow: 0, retained: 0 }
+      row.count++
+      row.shallow += size
+      row.retained += this.retained[v]
+      classes.set(className, row)
+      for (let child = this.domChildHead[v]; child !== -1; child = this.domNext[child]) stack.push(child)
+    }
+    objects.sort((a, b) => b.retained - a.retained)
+    return {
+      requested: ids.length,
+      found: starts.length,
+      totalObjects: objects.length,
+      shallow,
+      truncated,
+      classes: [...classes.values()].sort((a, b) => b.retained - a.retained),
+      objects: objects.slice(0, 100),
+    }
+  }
+
+  /** Top retained classes from the dominator-ranked object set. */
+  retainedClasses(limit = 30) {
+    if (!this.topRetained) return []
+    const classes = new Map()
+    for (const v of this.topRetained) {
+      const id = this.nodeId[v]
+      const className = this.objectClassName(id)
+      const row = classes.get(className) ?? { className, count: 0, retained: 0, maxRetained: 0, topObjectId: id }
+      row.count++
+      row.retained += this.retained[v]
+      if (this.retained[v] > row.maxRetained) {
+        row.maxRetained = this.retained[v]
+        row.topObjectId = id
+      }
+      classes.set(className, row)
+    }
+    return [...classes.values()].sort((a, b) => b.retained - a.retained).slice(0, limit)
   }
 
   retainedPage(page, pageSize, filters = {}) {

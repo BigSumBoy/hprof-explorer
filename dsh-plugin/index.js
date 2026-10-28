@@ -618,6 +618,15 @@ export function createApiHandler(runtime, options = {}) {
         sendJson(res, 200, await runtime.diff(base, other))
         return
       }
+      if (req.method === 'POST' && route === '/retained-set') {
+        const body = await readJsonBody(req)
+        const rec = runtime.pickDump(body.dump_id)
+        sendJson(res, 200, await runtime.call(rec, 'retainedSet', {
+          ids: Array.isArray(body.ids) ? body.ids : [],
+          limit: body.limit,
+        }))
+        return
+      }
       if (req.method === 'GET') {
         const rec = runtime.pickDump(url.searchParams.get('dump_id') ?? undefined)
         const params = paramsFromQuery(url.searchParams)
@@ -628,6 +637,8 @@ export function createApiHandler(runtime, options = {}) {
         if (route === '/path') return sendJson(res, 200, await runtime.call(rec, 'path', params))
         if (route === '/classpaths') return sendJson(res, 200, await runtime.call(rec, 'classPaths', params))
         if (route === '/retained') return sendJson(res, 200, await runtime.call(rec, 'retained', params))
+        if (route === '/retained-classes') return sendJson(res, 200, await runtime.call(rec, 'retainedClasses', params))
+        if (route === '/leaks') return sendJson(res, 200, await runtime.call(rec, 'leakSuspects', params))
         if (route === '/domtree') return sendJson(res, 200, await runtime.call(rec, 'domTree', params))
         if (route === '/strings') return sendJson(res, 200, await runtime.call(rec, 'strings', params))
         if (route === '/roots') return sendJson(res, 200, await runtime.call(rec, 'roots', params))
@@ -947,6 +958,11 @@ export function createToolDefinitions(runtime, options = {}) {
         dump_id: DUMP_ID,
         query: { type: 'string', description: 'Case-insensitive substring of the class name.' },
         sort: { type: 'string', enum: ['bytes', 'count', 'name'], description: 'Defaults to bytes.' },
+        group_by: {
+          type: 'string',
+          enum: ['package', 'classloader', 'superclass'],
+          description: 'Aggregate rows by package, class-loader class, or superclass instead of class.',
+        },
         limit: { type: 'number', description: 'Maximum rows to return (default 25, max 200).' },
       },
       async execute(args, exec) {
@@ -954,6 +970,7 @@ export function createToolDefinitions(runtime, options = {}) {
         return runtime.call(rec, 'classes', {
           query: asOptionalString(args?.query),
           sort: asOptionalString(args?.sort),
+          group_by: asOptionalString(args?.group_by),
           limit: clamp(args?.limit, 25, 1, 200),
         }, { signal: exec?.signal })
       },
@@ -1148,16 +1165,89 @@ export function createToolDefinitions(runtime, options = {}) {
     definition({
       name: 'hprof_referrers',
       description:
-        'Find objects and static fields that reference one object ("who references me"). This scans the whole '
-        + 'heap and stops at 200 matches or 3 seconds; the result reports truncation.',
+        'Find objects and static fields that reference one object ("who references me"). '
+        + 'Supports paging and strong/weak/soft/phantom/final reference filters. A full heap scan '
+        + 'stops at the requested window or the scan time limit; the result reports truncation.',
       required: ['id'],
       properties: {
         dump_id: DUMP_ID,
         id: { type: 'number', description: 'Target object id.' },
+        page: { type: 'number', description: 'Zero-based page (default 0).' },
+        size: { type: 'number', description: 'Page size (default 100, max 500).' },
+        type: { type: 'string', enum: ['all', 'strong', 'weak', 'soft', 'phantom', 'final'] },
+        field: { type: 'string', description: 'Case-insensitive field-name substring filter.' },
       },
       async execute(args, exec) {
         const rec = runtime.pickDump(args?.dump_id)
-        return runtime.call(rec, 'referrers', { id: asId(args?.id, 'id') }, { signal: exec?.signal })
+        const page = clamp(args?.page, 0, 0, 1_000_000)
+        const size = clamp(args?.size, 100, 1, 500)
+        const result = await runtime.call(rec, 'referrers', {
+          id: asId(args?.id, 'id'),
+          page,
+          size,
+          type: asOptionalString(args?.type),
+          field: asOptionalString(args?.field),
+        }, { signal: exec?.signal })
+        return { ...result, page, size }
+      },
+    }),
+    definition({
+      name: 'hprof_leaks',
+      description:
+        'Automatic leak suspects for Android/Java heaps. Ranks classes by the largest aggregated GC-root '
+        + 'container, retained native handles, hidden objects and released wrappers. Use class_id to inspect '
+        + 'one class, or omit it for an automatic top-N analysis. This can take several seconds on a large dump.',
+      properties: {
+        dump_id: DUMP_ID,
+        class_id: { type: 'number', description: 'Optional class id; omit for automatic candidates.' },
+        limit: { type: 'number', description: 'Maximum suspects (default 5, max 20).' },
+      },
+      async execute(args, exec) {
+        const rec = runtime.pickDump(args?.dump_id)
+        return runtime.call(rec, 'leakSuspects', {
+          class_id: args?.class_id === undefined ? undefined : asId(args.class_id, 'class_id'),
+          limit: clamp(args?.limit, 5, 1, 20),
+        }, { signal: exec?.signal })
+      },
+    }),
+    definition({
+      name: 'hprof_dominators',
+      description:
+        'Top classes by aggregated retained size from the dominator-ranked objects. Use it to find the '
+        + 'classes whose dominator subtrees hold the most memory before drilling into a specific object.',
+      properties: {
+        dump_id: DUMP_ID,
+        limit: { type: 'number', description: 'Maximum rows (default 30, max 200).' },
+      },
+      async execute(args, exec) {
+        const rec = runtime.pickDump(args?.dump_id)
+        return runtime.call(rec, 'retainedClasses', {
+          limit: clamp(args?.limit, 30, 1, 200),
+        }, { signal: exec?.signal })
+      },
+    }),
+    definition({
+      name: 'hprof_retained_set',
+      description:
+        'Compute the union of objects dominated by one or more selected object ids. Returns shallow total, '
+        + 'class counts, and the most-retained objects in the retained set.',
+      required: ['ids'],
+      properties: {
+        dump_id: DUMP_ID,
+        ids: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Object ids whose dominator subtrees should be combined.',
+        },
+        limit: { type: 'number', description: 'Maximum objects to enumerate (default 20000).' },
+      },
+      async execute(args, exec) {
+        const rec = runtime.pickDump(args?.dump_id)
+        if (!Array.isArray(args?.ids) || args.ids.length === 0) throw new Error('ids must be a non-empty array')
+        return runtime.call(rec, 'retainedSet', {
+          ids: args.ids.map((id) => asId(id, 'ids[]')),
+          limit: clamp(args?.limit, 20000, 1, 100000),
+        }, { signal: exec?.signal })
       },
     }),
     definition({

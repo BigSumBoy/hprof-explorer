@@ -37,16 +37,19 @@ const CAPABILITIES = {
     'entity.fields': 'Instance fields or class field metadata. params: { id, dump_id? }',
     'entity.array': 'Paged array elements or String text. params: { id, page?, size?, dump_id? }',
     'entity.statics': 'Class static fields. params: { id, dump_id? }',
-    'entity.referrers': 'Incoming references. params: { id, dump_id? }',
+    'entity.referrers': 'Incoming references. params: { id, page?, size?, type?, field?, dump_id? }',
     'entity.children': 'Outgoing object references from an instance/class. params: { id, page?, size?, dump_id? }',
-    'query.classes': 'Class histogram. params: { query?, sort?, min_count?, min_bytes?, offset?, limit?, dump_id? }',
+    'query.classes': 'Class histogram, optionally grouped. params: { query?, sort?, group_by?: package|classloader|superclass, min_count?, min_bytes?, offset?, limit?, dump_id? }',
     'query.instances': 'Instances of a class, optionally projecting field values. params: { class_id, kind?, page?, size?, fields?, query?, heap?, id_prefix?, min_bytes?, dump_id? }',
     'query.strings': 'String search. params: { query?, page?, size?, readable?, min_length?, id_prefix?, dump_id? }',
     'query.roots': 'GC roots. params: { type?, query?, heap?, page?, size?, id_prefix?, dump_id? }',
     'query.retained': 'Retained-size ranking. params: { class_filter?, min_retained?, page?, size?, dump_id? }',
+    'query.retainedClasses': 'Top classes by retained size from the dominator ranking. params: { limit?, dump_id? }',
     'paths.object': 'Shortest GC-root path for one object. params: { id, weak?, dump_id? }',
     'paths.class': 'Grouped GC-root paths for one class. params: { class_id, kind?, weak?, page?, size?, dump_id? }',
     'analyze.classStats': 'Aggregate reachability, native state, callsites and roots/holders. params: { class_id, kind?, dump_id? }',
+    'analyze.leaks': 'Automatic leak suspects: native-heavy and large-container classes. params: { class_id?, limit?, dump_id? }',
+    'analyze.retainedSet': 'Union of objects dominated by selected object ids. params: { ids, limit?, dump_id? }',
     'analyze.diff': 'Compare two dumps by class. params: { base, other }',
     'analyze.report': 'Write a Markdown report including findings. params: { dump_id?, out_path? }',
     'findings.create': 'Attach a finding to a target. params: { dump_id?, target, title, note?, severity?, tags?, author? }',
@@ -230,7 +233,16 @@ export function createHprofService(runtime, options = {}) {
         return { className: detail.class?.name ?? null, statics: detail.class?.statics ?? [] }
       },
       async referrers(params = {}, exec) {
-        return call(params.dump_id, 'referrers', { id: asId(params.id, 'id') }, exec)
+        const page = asPage(params.page)
+        const size = asSize(params.size, 100, 500)
+        const result = await call(params.dump_id, 'referrers', {
+          id: asId(params.id, 'id'),
+          page,
+          size,
+          type: params.type,
+          field: params.field,
+        }, exec)
+        return withMore({ ...result, page }, page, size)
       },
       async children(params = {}, exec) {
         const page = asPage(params.page)
@@ -264,6 +276,7 @@ export function createHprofService(runtime, options = {}) {
         const result = await call(params.dump_id, 'classes', {
           query: params.query,
           sort: params.sort,
+          group_by: params.group_by,
           min_count: params.min_count,
           min_bytes: params.min_bytes,
           offset,
@@ -324,6 +337,10 @@ export function createHprofService(runtime, options = {}) {
         }, exec)
         return withMore(result, page, size)
       },
+      async retainedClasses(params = {}, exec) {
+        const limit = asSize(params.limit, 30, 200)
+        return call(params.dump_id, 'retainedClasses', { limit }, exec)
+      },
     },
 
     paths: {
@@ -353,6 +370,19 @@ export function createHprofService(runtime, options = {}) {
         return call(params.dump_id, 'classStats', {
           class_id: asId(params.class_id, 'class_id'),
           kind: params.kind === 'primitive' ? 'primitive' : 'class',
+        }, exec)
+      },
+      async leaks(params = {}, exec) {
+        return call(params.dump_id, 'leakSuspects', {
+          class_id: params.class_id === undefined ? undefined : asId(params.class_id, 'class_id'),
+          limit: asSize(params.limit, 5, 20),
+        }, exec)
+      },
+      async retainedSet(params = {}, exec) {
+        if (!Array.isArray(params.ids) || params.ids.length === 0) throw new Error('ids must be a non-empty array')
+        return call(params.dump_id, 'retainedSet', {
+          ids: params.ids.map((id) => asId(id, 'ids[]')),
+          limit: asSize(params.limit, 20000, 100000),
         }, exec)
       },
       async diff(params = {}, exec) {

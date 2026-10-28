@@ -89,16 +89,19 @@ pnpm dsh plugin --profile web add link:D:/src/hprof-explorer/dsh-plugin
 | `hprof_annotate(action, ...)` | 创建/列出/更新/删除 finding；target 支持 object/class/path/field/dump |
 | `hprof_ui(action, ...)` | 扁平、类型化的 UI 操作入口；`showClassPaths`/`showUnreachable` 等高层动作，`action="manifest"` 查看完整目录 |
 | `hprof_open(path)` | 解析并打开 dump，返回 `dump_id`、计数、Top 类、Top Retained |
-| `hprof_classes(query?, sort?, limit?)` | 类直方图，带 `id` / `kind` |
+| `hprof_classes(query?, sort?, group_by?, ...)` | 类直方图，可按 package / ClassLoader / 父类聚合 |
 | `hprof_instances(class_id, kind?, ...)` | 某类对象分页；数组类型用 `kind: 'primitive'` |
 | `hprof_object(id)` | 对象/类详情：字段、数组、String、retained、支配者 |
 | `hprof_path(id, weak?)` | 最短 GC Root 路径 |
 | `hprof_class_paths(class_id, kind?, weak?, page?, size?)` | 类级 GC Root 路径分组；数组下标归一化为 `[]`，按实例数降序，分页返回并带 holder id |
 | `hprof_class_stats(class_id, kind?)` | 聚合实例数、可达/不可达、native 句柄、创建点、root/holder 分类 |
 | `hprof_retained(class_filter?, min_retained?, ...)` | Retained Size 排行 |
+| `hprof_dominators(limit?)` | 按支配树聚合的 Top Retained 类 |
+| `hprof_retained_set(ids, limit?)` | 选中对象的支配子树并集、class/object 汇总 |
 | `hprof_strings(query?, min_length?, readable?, ...)` | 字符串搜索，可包含二进制内容 |
 | `hprof_roots(type?, query?, ...)` | GC Roots 列表与类型过滤 |
-| `hprof_referrers(id)` | 谁引用这个对象（全堆扫描，200 条/3 秒上限） |
+| `hprof_referrers(id, page?, size?, type?, field?)` | 谁引用这个对象；支持分页和 strong/weak/soft/phantom/final 过滤 |
+| `hprof_leaks(class_id?, limit?)` | 自动泄漏嫌疑：最大聚合容器、native retained、hidden、released wrapper |
 | `hprof_diff(base, other)` | 两份 dump 的类级差分（增长/缩减/新增/消失） |
 | `hprof_report(dump_id?, out_path?)` | 生成 Markdown 报告并写入文件 |
 | `hprof_close(dump_id?)` | 结束引擎进程，释放内存 |
@@ -335,7 +338,7 @@ node dsh-plugin/client-smoke.mjs
 CLIENT SMOKE OK
 ```
 
-Smoke 覆盖：引擎协议、18 个工具（diff 用合成 profile 验证聚合）、`class_stats` 的 native/released 聚合、`class_paths` 分页与 holder id、`hprof_api` 的 query/entity/paths/analyze 投影、`hprof_ui` 的 manifest/高层动作展开、`hprof_ptc` 的绑定调用/日志/错误隔离、`hprof_annotate` 的持久化 CRUD、`/hprof-api` 的 dumps/summary/classes/object/path/domtree/strings/roots/referrers/findings/ui-state/ui-events/report、Client 的 tab 类型、guide、body、composer、`main` 工作区、`hprof.conversation` 与 `sidebar.panellist` 注册。工作区的 Chat 渲染、拖拽分隔、表格选中/过滤上报需要在浏览器里人工验证。
+Smoke 覆盖：引擎协议、21 个工具（diff 用合成 profile 验证聚合）、`class_stats` 的 native/released 聚合、`class_paths` 分页与 holder id、`hprof_api` 的 query/entity/paths/analyze 投影、`hprof_leaks`/`hprof_dominators`/`hprof_retained_set`、`hprof_classes` 分组、引用过滤、`hprof_ui` 的 manifest/高层动作展开、`hprof_ptc` 的绑定调用/日志/错误隔离、`hprof_annotate` 的持久化 CRUD、`/hprof-api` 的 dumps/summary/classes/object/path/domtree/strings/roots/referrers/leaks/retained-classes/retained-set/findings/ui-state/ui-events/report、Client 的 tab 类型、guide、body、composer、`main` 工作区、`hprof.conversation` 与 `sidebar.panellist` 注册。工作区的 Chat 渲染、拖拽分隔、表格选中/过滤上报需要在浏览器里人工验证。
 
 ## 限制
 
