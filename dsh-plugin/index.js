@@ -642,7 +642,8 @@ export function createApiHandler(runtime, options = {}) {
         if (route === '/domtree') return sendJson(res, 200, await runtime.call(rec, 'domTree', params))
         if (route === '/strings') return sendJson(res, 200, await runtime.call(rec, 'strings', params))
         if (route === '/roots') return sendJson(res, 200, await runtime.call(rec, 'roots', params))
-        if (route === '/referrers') return sendJson(res, 200, await runtime.call(rec, 'referrers', params))
+        if (route === '/referrers') return sendJson(res, 200, await runtime.call(rec, 'references', { ...params, direction: 'in' }))
+        if (route === '/references') return sendJson(res, 200, await runtime.call(rec, 'references', params))
       }
       sendJson(res, 404, { error: `unknown hprof route: ${req.method} ${route}` })
     } catch (error) {
@@ -991,6 +992,11 @@ export function createToolDefinitions(runtime, options = {}) {
         },
         id_prefix: { type: 'string', description: 'Optional object-id prefix, decimal or 0x hex.' },
         min_bytes: { type: 'number', description: 'Minimum shallow size in bytes.' },
+        sort: {
+          type: 'string',
+          enum: ['default', 'depth'],
+          description: 'default keeps heap order; depth sorts by strong-reference depth, deepest first.',
+        },
         page: { type: 'number', description: 'Zero-based page (default 0).' },
         size: { type: 'number', description: 'Page size (default 20, max 200).' },
       },
@@ -1001,6 +1007,7 @@ export function createToolDefinitions(runtime, options = {}) {
           kind: args?.kind === 'primitive' ? 'primitive' : 'class',
           id_prefix: asOptionalString(args?.id_prefix),
           min_bytes: args?.min_bytes,
+          sort: args?.sort === 'depth' ? 'depth' : undefined,
           page: clamp(args?.page, 0, 0, 1_000_000),
           size: clamp(args?.size, 20, 1, Math.min(runtime.config.maxPageSize, 200)),
         }, { signal: exec?.signal })
@@ -1209,6 +1216,33 @@ export function createToolDefinitions(runtime, options = {}) {
           field: asOptionalString(args?.field),
         }, { signal: exec?.signal })
         return { ...result, page, size }
+      },
+    }),
+    definition({
+      name: 'hprof_references',
+      description:
+        'Incoming or outgoing references for one object. Incoming answers "who references me"; outgoing '
+        + 'answers "what do I reference". Supports paging and strong/weak/soft/phantom/final filters.',
+      required: ['id'],
+      properties: {
+        dump_id: DUMP_ID,
+        id: { type: 'number', description: 'Target object id.' },
+        direction: { type: 'string', enum: ['in', 'out'], description: 'Defaults to in.' },
+        page: { type: 'number', description: 'Zero-based page (default 0).' },
+        size: { type: 'number', description: 'Page size (default 100, max 500).' },
+        type: { type: 'string', enum: ['all', 'strong', 'weak', 'soft', 'phantom', 'final'] },
+        field: { type: 'string', description: 'Case-insensitive field-name substring filter.' },
+      },
+      async execute(args, exec) {
+        const rec = runtime.pickDump(args?.dump_id)
+        return runtime.call(rec, 'references', {
+          id: asId(args?.id, 'id'),
+          direction: args?.direction === 'out' ? 'out' : 'in',
+          page: clamp(args?.page, 0, 0, 1_000_000),
+          size: clamp(args?.size, 100, 1, 500),
+          type: asOptionalString(args?.type),
+          field: asOptionalString(args?.field),
+        }, { signal: exec?.signal })
       },
     }),
     definition({

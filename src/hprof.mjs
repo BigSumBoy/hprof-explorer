@@ -800,8 +800,11 @@ export class HprofIndex {
       if (heapFilter && !heap.toLowerCase().includes(heapFilter)) continue;
       const size = this.objectSize(oid);
       if (minSize && size < minSize) continue;
-      filtered.push({ oid, className, heap, size });
+      const node = this.nodeIndex?.get(oid);
+      const depth = node === undefined ? -1 : (this.bfsDist?.[node] ?? -1);
+      filtered.push({ oid, className, heap, size, depth });
     }
+    if (filters.sort === 'depth') filtered.sort((a, b) => b.depth - a.depth);
     const start = page * pageSize;
     const slice = filtered.slice(start, start + pageSize);
     return {
@@ -813,6 +816,7 @@ export class HprofIndex {
         className: o.className,
         heap: o.heap,
         size: o.size,
+        depth: o.depth,
       })),
     };
   }
@@ -861,6 +865,57 @@ export class HprofIndex {
     }
     const start = page * pageSize;
     return { total: items.length, page, pageSize, items: items.slice(start, start + pageSize) };
+  }
+
+  /** Outgoing references from one object/class, with paging and type filters. */
+  outgoingReferences(id, page = 0, size = 100, options = {}) {
+    const typeFilter = String(options.type ?? 'all').toLowerCase()
+    const fieldFilter = String(options.field ?? '').toLowerCase()
+    const items = []
+    const add = (target, via, referrerClass, weak) => {
+      if (target == null) return
+      let type = weak ? 'weak' : 'strong'
+      if (weak) {
+        if (referrerClass === 'java.lang.ref.SoftReference') type = 'soft'
+        else if (referrerClass === 'java.lang.ref.PhantomReference') type = 'phantom'
+        else if (referrerClass === 'java.lang.ref.FinalizerReference' || referrerClass === 'sun.misc.Cleaner') type = 'final'
+      }
+      if (typeFilter !== 'all' && type !== typeFilter) return
+      if (fieldFilter !== '' && !String(via).toLowerCase().includes(fieldFilter)) return
+      const className = this.objectClassName(target)
+      if (className == null) return
+      items.push({ id: target, className, via, type })
+    }
+    const off = this.objects.get(id)
+    if (off !== undefined) {
+      const tag = this.buf[off]
+      if (tag === HEAP.INSTANCE_DUMP) {
+        const referrerClass = this.objectClassName(id)
+        for (const field of this.instanceFields(id)) {
+          if (field.type === 'object' && field.value !== null) add(field.value, `field ${field.name}`, referrerClass, field.weak === true)
+        }
+      } else if (tag === HEAP.OBJECT_ARRAY_DUMP) {
+        const arr = this.arrayInfo(id)
+        for (let i = 0; i < arr.length; i++) add(arr.elements(i), `[${i}]`, this.objectClassName(id), false)
+      }
+    } else {
+      const cls = this.classes.get(id)
+      if (cls !== undefined) {
+        for (const field of cls.statics) {
+          if (field.type === 2 && field.value != null) add(field.value, `static ${field.name}`, cls.name, false)
+        }
+      }
+    }
+    const start = page * size
+    return {
+      id,
+      direction: 'out',
+      total: items.length,
+      page,
+      size,
+      hasMore: start + size < items.length,
+      items: items.slice(start, start + size),
+    }
   }
 
   referrers(target, limit = 200, maxMs = 3000, options = {}) {

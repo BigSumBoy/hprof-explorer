@@ -113,6 +113,7 @@ const methods = {
       className: String(params.query ?? ''),
       heap: String(params.heap ?? ''),
       minSize: params.min_bytes === undefined ? '' : String(params.min_bytes),
+      sort: params.sort,
     })
     const requested = params.fields === '*'
       ? ['*']
@@ -462,6 +463,24 @@ const methods = {
       className: String(params.query ?? ''),
       type: String(params.type ?? ''),
       heap: String(params.heap ?? ''),
+    })
+  },
+
+  references(params = {}) {
+    const id = Number(params.id)
+    if (!Number.isSafeInteger(id) || id < 0) throw new Error('id must be a non-negative integer')
+    const page = clamp(params.page, 0, 0, 1_000_000)
+    const size = clamp(params.size, 100, 1, 500)
+    if (params.direction === 'out') {
+      return idx.outgoingReferences(id, page, size, {
+        type: params.type,
+        field: params.field,
+      })
+    }
+    return idx.referrers(id, size, 5_000, {
+      offset: page * size,
+      type: params.type,
+      field: params.field,
     })
   },
 

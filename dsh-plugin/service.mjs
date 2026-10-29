@@ -38,6 +38,7 @@ const CAPABILITIES = {
     'entity.array': 'Paged array elements or String text. params: { id, page?, size?, dump_id? }',
     'entity.statics': 'Class static fields. params: { id, dump_id? }',
     'entity.referrers': 'Incoming references. params: { id, page?, size?, type?, field?, dump_id? }',
+    'entity.references': 'Incoming or outgoing references. params: { id, direction?: in|out, page?, size?, type?, field?, dump_id? }',
     'entity.children': 'Outgoing object references from an instance/class. params: { id, page?, size?, dump_id? }',
     'query.classes': 'Class histogram, optionally grouped. params: { query?, sort?, group_by?: package|classloader|superclass, min_count?, min_bytes?, offset?, limit?, dump_id? }',
     'query.instances': 'Instances of a class, optionally projecting field values. params: { class_id, kind?, page?, size?, fields?, query?, heap?, id_prefix?, min_bytes?, dump_id? }',
@@ -233,16 +234,24 @@ export function createHprofService(runtime, options = {}) {
         return { className: detail.class?.name ?? null, statics: detail.class?.statics ?? [] }
       },
       async referrers(params = {}, exec) {
-        const page = asPage(params.page)
-        const size = asSize(params.size, 100, 500)
-        const result = await call(params.dump_id, 'referrers', {
+        return call(params.dump_id, 'references', {
           id: asId(params.id, 'id'),
-          page,
-          size,
+          direction: 'in',
+          page: asPage(params.page),
+          size: asSize(params.size, 100, 500),
           type: params.type,
           field: params.field,
         }, exec)
-        return withMore({ ...result, page }, page, size)
+      },
+      async references(params = {}, exec) {
+        return call(params.dump_id, 'references', {
+          id: asId(params.id, 'id'),
+          direction: params.direction === 'out' ? 'out' : 'in',
+          page: asPage(params.page),
+          size: asSize(params.size, 100, 500),
+          type: params.type,
+          field: params.field,
+        }, exec)
       },
       async children(params = {}, exec) {
         const page = asPage(params.page)
@@ -297,6 +306,7 @@ export function createHprofService(runtime, options = {}) {
           heap: params.heap,
           id_prefix: params.id_prefix,
           min_bytes: params.min_bytes,
+          sort: params.sort,
         }, exec)
         return withMore(result, page, size)
       },

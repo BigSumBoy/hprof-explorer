@@ -52,6 +52,14 @@ try {
     size: 2,
   })
   assert.ok(instances.items.length > 0, 'expected instances for a class with count > 10')
+  const instancesByDepth = await call('hprof_instances', {
+    dump_id: opened.dump_id,
+    class_id: target.id,
+    kind: target.kind,
+    sort: 'depth',
+    size: 10,
+  })
+  assert.ok(instancesByDepth.items.every((item, index, all) => index === 0 || all[index - 1].depth >= item.depth))
   console.log(`instances: ${instances.total} total for ${target.name}`)
 
   const classPaths = await call('hprof_class_paths', {
@@ -343,7 +351,14 @@ try {
     limit: 5,
   })
   assert.ok(Array.isArray(allGcPaths.paths) && allGcPaths.paths.length > 0)
-  console.log(`path: ${gcPath.distance} hops, all-paths ${allGcPaths.totalPaths}`)
+  const outbound = await call('hprof_references', {
+    dump_id: opened.dump_id,
+    id: big.id,
+    direction: 'out',
+    size: 10,
+  })
+  assert.equal(outbound.direction, 'out')
+  console.log(`path: ${gcPath.distance} hops, all-paths ${allGcPaths.totalPaths}, outbound ${outbound.total}`)
 
   const strings = await call('hprof_strings', { dump_id: opened.dump_id, query: '设置', size: 3 })
   assert.ok(strings.items.length > 0, 'expected readable strings')

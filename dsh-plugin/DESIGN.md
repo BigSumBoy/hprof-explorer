@@ -43,7 +43,7 @@ The plugin does not start `src/server.mjs`. The Host owns the lifecycle; the par
 
 ## Service first
 
-`service.mjs` is the source of truth. Its manifest currently exposes 32 operations:
+`service.mjs` is the source of truth. Its manifest currently exposes 33 operations:
 
 ```text
 dump.open/list/close/summary
@@ -59,7 +59,7 @@ All consumers project this surface:
 
 | Consumer | Projection |
 |---|---|
-| Model | generic `hprof_api`, flat `hprof_ui` actions, convenience tools (21 tools total) |
+| Model | generic `hprof_api`, flat `hprof_ui` actions, convenience tools (22 tools total) |
 | PTC | `hprof.<group>.<method>` namespace generated from the manifest |
 | Web UI | `/hprof-api` routes and client components |
 | Reports | service `analyze.report` includes findings |

@@ -704,8 +704,9 @@ window.__ModuleLoader__.load({
         })))
     }
 
-    function InstancesTab({ dumpId, classInfo, onObject, onBack, onSelectRow, onFiltersChange, initialFilters, selectedRowId, initialPage, onViewChange }) {
+    function InstancesTab({ dumpId, classInfo, onObject, onPath, onBack, onSelectRow, onFiltersChange, initialFilters, selectedRowId, initialPage, onViewChange }) {
       const [page, setPage] = useState(initialPage ?? 0)
+      const [sort, setSort] = useState('depth')
       const { filters, applied, set, key } = useFilters({ idPrefix: '', query: '', heap: '', minBytes: '', ...(initialFilters ?? {}) })
       const firstClassRef = useRef(true)
       const firstFilterRef = useRef(true)
@@ -718,8 +719,8 @@ window.__ModuleLoader__.load({
         setPage(0)
       }, [key])
       useEffect(() => { onFiltersChange?.('instances', applied) }, [applied, onFiltersChange])
-      useEffect(() => { onViewChange?.('instances', { page }) }, [page, onViewChange])
-      const params = new URLSearchParams({ dump_id: dumpId ?? '', class_id: String(classInfo?.id ?? ''), kind: classInfo?.kind ?? 'class', page: String(page), size: '200' })
+      useEffect(() => { onViewChange?.('instances', { page, sort }) }, [page, sort, onViewChange])
+      const params = new URLSearchParams({ dump_id: dumpId ?? '', class_id: String(classInfo?.id ?? ''), kind: classInfo?.kind ?? 'class', page: String(page), size: '200', sort })
       if (applied.idPrefix !== '') params.set('id_prefix', applied.idPrefix)
       if (applied.query !== '') params.set('query', applied.query)
       if (applied.heap !== '') params.set('heap', applied.heap)
@@ -733,12 +734,19 @@ window.__ModuleLoader__.load({
         h('div', { style: S.row },
           h(Btn, { onClick: onBack }, '← 返回'),
           h('span', { style: { ...S.mono, fontWeight: 500 } }, classInfo.name),
-          h('span', { style: S.muted }, `${total.toLocaleString()} 个对象`)),
+          h('span', { style: S.muted }, `${total.toLocaleString()} 个对象`),
+          h('select', {
+            className: 'hp-select', style: S.select, value: sort,
+            onChange: (event) => { setPage(0); setSort(event.target.value) },
+          },
+            h('option', { value: 'depth' }, '引用深度（深→浅）'),
+            h('option', { value: 'default' }, '堆顺序'))),
         h(Section, { title: '对象' }, h(Table, {
           columns: [
             { key: 'id', title: '对象', render: (row) => h('span', { style: S.mono }, hexId(row.id)) },
             { key: 'className', title: '类' },
             { key: 'heap', title: '堆' },
+            { key: 'depth', title: '引用深度', align: 'right', render: (row) => row.depth >= 0 ? row.depth : '—' },
             { key: 'size', title: 'Shallow', align: 'right', render: (row) => formatBytes(row.size) },
           ],
           filters: [
@@ -751,6 +759,10 @@ window.__ModuleLoader__.load({
           onRowClick: (row) => onObject(row.id),
           onRowSelect: (row) => onSelectRow?.('instances', row),
           selectedRowId,
+          rowActions: (row) => h('button', {
+            type: 'button', className: 'hp-action',
+            onClick: (event) => { event.stopPropagation(); onPath(row.id) },
+          }, 'GC 路径'),
           empty: '没有对象',
         })),
         h('div', { style: { ...S.row, marginTop: 8 } },
@@ -1354,18 +1366,25 @@ window.__ModuleLoader__.load({
       const [page, setPage] = useState(0)
       const [type, setType] = useState('all')
       const [field, setField] = useState('')
+      const [direction, setDirection] = useState('in')
       const result = useFetch(dumpId && objectId !== null
-        ? `${API}/referrers?dump_id=${encodeURIComponent(dumpId)}&id=${objectId}&page=${page}&size=100&type=${encodeURIComponent(type)}&field=${encodeURIComponent(field)}`
+        ? `${API}/references?dump_id=${encodeURIComponent(dumpId)}&id=${objectId}&direction=${direction}&page=${page}&size=100&type=${encodeURIComponent(type)}&field=${encodeURIComponent(field)}`
         : null, { cache: true })
       if (result.error !== null) return h('div', { style: S.error }, result.error)
       const data = result.data
       const items = data?.items ?? []
       const total = data?.total
-      const hasMore = data?.truncated === true || (typeof total === 'number' && (page + 1) * 100 < total)
+      const hasMore = data?.truncated === true || data?.hasMore === true || (typeof total === 'number' && page * 100 + items.length < total)
       return h('div', null,
         h('div', { style: S.row },
           h(Btn, { onClick: onBack }, '← 返回'),
-          h('span', { style: S.muted }, objectId === null ? '' : `谁引用 ${hexId(objectId)}`),
+          h('span', { style: S.muted }, objectId === null ? '' : `${direction === 'in' ? '谁引用' : '引用了谁'} ${hexId(objectId)}`),
+          h('select', {
+            className: 'hp-select', style: S.select, value: direction,
+            onChange: (event) => { setPage(0); setDirection(event.target.value) },
+          },
+            h('option', { value: 'in' }, '入引用 Inbound'),
+            h('option', { value: 'out' }, '出引用 Outbound')),
           h('select', {
             className: 'hp-select', style: S.select, value: type,
             onChange: (event) => { setPage(0); setType(event.target.value) },
@@ -1385,19 +1404,19 @@ window.__ModuleLoader__.load({
           ? h('div', { style: S.muted }, '加载中…')
           : h('div', null,
             h('div', { style: S.hint },
-              `第 ${page + 1} 页 · ${items.length} 条${total === null || total === undefined ? '（未扫描完）' : ` / ${total}`}${data.truncated ? ' · 已截断' : ''} · 扫描 ${data.tookMs} ms`),
-            h(Section, { title: '引用者' }, h(Table, {
+              `第 ${page + 1} 页 · ${items.length} 条${total === null || total === undefined ? '（未扫描完）' : ` / ${total}`}${data.truncated ? ' · 已截断' : ''} · 扫描 ${data.tookMs ?? 0} ms`),
+            h(Section, { title: direction === 'in' ? '引用者' : '引用的对象' }, h(Table, {
               columns: [
-                { key: 'id', title: '对象', render: (row) => h('span', { style: S.mono }, hexId(row.id)) },
+                { key: 'id', title: direction === 'in' ? '引用者' : '目标对象', render: (row) => h('span', { style: S.mono }, hexId(row.id)) },
                 { key: 'className', title: '类' },
-                { key: 'field', title: '字段/下标' },
+                { key: 'field', title: '字段/下标', render: (row) => row.via ?? row.field ?? null },
                 { key: 'type', title: '类型', render: (row) => h('span', { className: 'hp-ref-type' }, row.type ?? 'strong') },
               ],
               rows: items,
               onRowClick: (row) => onObject(row.id),
               onRowSelect: (row) => onSelectRow?.('referrers', row),
               selectedRowId,
-              empty: '没有找到引用者',
+              empty: direction === 'in' ? '没有找到引用者' : '没有找到出引用',
             })),
             h('div', { style: { ...S.row, marginTop: 8 } },
               h(Btn, { onClick: () => setPage((value) => Math.max(0, value - 1)), disabled: page === 0 }, '上一页'),
@@ -1539,10 +1558,10 @@ window.__ModuleLoader__.load({
           h('span', { className: 'hp-tree-id' }, hexId(node.id)),
           h('span', { style: { flex: 1 } }),
           h('button', {
-            type: 'button', className: 'hp-action hp-action-quiet',
+            type: 'button', className: 'hp-action',
             title: '计算该对象支配的 Retained Set',
             onClick: (event) => { event.stopPropagation(); onRetainedSet?.(node.id) },
-          }, 'RS'),
+          }, 'Retained Set'),
           h('span', { className: 'hp-tree-metric' }, `retained ${formatBytes(node.retained)}`),
           h('span', { className: 'hp-tree-metric' }, `shallow ${formatBytes(node.shallow)}`)),
         open ? h('div', null,
@@ -1794,7 +1813,7 @@ window.__ModuleLoader__.load({
 
     function LeaksTab({ dumpId, onClass, onClassPaths }) {
       const [nonce, setNonce] = useState(0)
-      const result = useFetch(dumpId ? `${API}/leaks?dump_id=${encodeURIComponent(dumpId)}&limit=8&_=${nonce}` : null)
+      const result = useFetch(dumpId ? `${API}/leaks?dump_id=${encodeURIComponent(dumpId)}&limit=8&_=${nonce}` : null, { cache: true })
       if (result.error !== null) return h('div', { style: S.error }, result.error)
       const data = result.data
       const suspects = data?.suspects ?? []
@@ -2804,7 +2823,7 @@ window.__ModuleLoader__.load({
       })
       else if (tab === 'instances') body = h(InstancesTab, {
         key: tabMountKey,
-        dumpId: activeDumpId, classInfo, onObject: openObject, onBack: () => setTab('classes'),
+        dumpId: activeDumpId, classInfo, onObject: openObject, onPath: openPath, onBack: () => setTab('classes'),
         onSelectRow: handleRowSelect, onFiltersChange: handleFiltersChange,
         initialFilters: initialFiltersFor('instances'), selectedRowId: selectedRowIdFor('instances'),
         initialPage: initialPageFor('instances'), onViewChange: handleViewChange,
